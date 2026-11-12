@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Geelong Line">
+<meta name="theme-color" content="#0e0b14">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Geelong Line</title>
+<style>
+  :root{
+    --bg:#0e0b14; --card:#1a1622; --card2:#241e2f; --line:#2e2839;
+    --text:#f4f1f8; --muted:#9a93a8; --accent:#c06ad8; --accent2:#8f1a95;
+    --ok:#3ddc97; --late:#ffb547; --bad:#ff5d6c; --r:18px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font:16px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  body{padding:calc(env(safe-area-inset-top) + 10px) 16px calc(env(safe-area-inset-bottom) + 28px);max-width:560px;margin:0 auto;min-height:100vh}
+  button,select{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+  .top{display:flex;align-items:center;justify-content:space-between;margin:4px 2px 14px}
+  .top h1{font-size:28px;letter-spacing:-.02em;margin:0;font-weight:750}
+  .top h1 small{display:block;font-size:13px;color:var(--muted);font-weight:500;letter-spacing:0}
+  .iconbtn{width:40px;height:40px;border-radius:12px;background:var(--card);display:grid;place-items:center}
+  .iconbtn svg{width:20px;height:20px;stroke:var(--text)}
+  .spin svg{animation:spin 1s linear infinite} @keyframes spin{to{transform:rotate(360deg)}}
+
+  .seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--card);border-radius:14px;padding:4px;gap:4px}
+  .seg button{padding:10px 6px;border-radius:10px;font-weight:600;font-size:15px;color:var(--muted)}
+  .seg button.on{background:var(--accent2);color:#fff}
+  .seg.small button{padding:8px 4px;font-size:14px}
+  .seg.small button.on{background:var(--card2);color:var(--text)}
+
+  .station{margin-top:12px;background:var(--card);border-radius:var(--r);padding:12px 16px;position:relative}
+  .station small{display:block;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+  .station .nm{font-size:22px;font-weight:700;display:flex;align-items:center;gap:6px}
+  .station .nm::after{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translateY(-3px);margin-left:4px}
+  .station select{position:absolute;inset:0;opacity:0;width:100%;font-size:16px}
+  .dir{margin-top:10px}
+
+  .banner{margin-top:12px;background:#2a1c10;border:1px solid #4a3218;color:#ffd9a3;border-radius:14px;padding:12px 14px;font-size:14px}
+  .banner b{display:block;margin-bottom:2px;color:#ffc46b}
+  .banner details summary{list-style:none;cursor:pointer} .banner details summary::-webkit-details-marker{display:none}
+  .banner .d{margin-top:8px;color:#e9c79a;font-size:13px} .banner a{color:#ffc46b}
+  .err{background:#2b1218;border-color:#53202b;color:#ffb3bc} .err b{color:#ff8b98}
+  .info{background:#191527;border-color:#2e2650;color:#c9c0ea} .info b{color:#d9cfff}
+
+  h2{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:22px 4px 8px;font-weight:600}
+  .list{background:var(--card);border-radius:var(--r);overflow:hidden}
+  .empty{padding:28px 18px;text-align:center;color:var(--muted)}
+  .more{display:block;width:100%;padding:14px;color:var(--accent);font-weight:600;border-top:1px solid var(--line)}
+
+  /* timetable rows */
+  .tt{display:grid;grid-template-columns:96px 1fr auto;gap:10px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
+  .tt:first-child{border-top:0}
+  .tt .t{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+  .tt .dst{font-size:15px} .tt .dst small{display:block;color:var(--muted);font-size:13px}
+  .tt .pl{color:var(--muted);font-size:13px;text-align:right}
+  .tt .pl b{display:block;color:var(--text);font-size:17px}
+  .day{padding:8px 16px;background:var(--card2);font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+
+  /* live */
+  .hero{margin-top:16px;background:linear-gradient(145deg,#3a1544,#1d1426 70%);border-radius:24px;padding:20px;position:relative;cursor:pointer}
+  .hero .lbl{padding-right:92px;font-size:13px;color:#d8c4e2;text-transform:uppercase;letter-spacing:.08em}
+  .hero .big{font-size:64px;font-weight:780;letter-spacing:-.04em;line-height:1;margin:8px 0 6px;font-variant-numeric:tabular-nums}
+  .hero .big small{font-size:24px;font-weight:600;letter-spacing:0;margin-left:4px;color:#e6d6ee}
+  .hero .meta{display:flex;flex-wrap:wrap;gap:6px 14px;color:#eadff0;font-size:15px;margin-top:10px}
+  .hero .meta b{font-weight:650}
+  .plat{position:absolute;right:18px;top:18px;text-align:center;background:rgba(255,255,255,.1);border-radius:16px;padding:8px 12px;min-width:64px}
+  .plat small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#d8c4e2}
+  .plat b{font-size:28px;font-weight:750}
+  .where{margin-top:12px;font-size:14px;color:#e6d6ee;display:flex;align-items:center;gap:8px}
+  .where::before{content:"🚆"}
+
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;border-radius:999px;padding:3px 9px;white-space:nowrap}
+  .pill.live{background:rgba(61,220,151,.14);color:var(--ok)}
+  .pill.live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 1.6s infinite}
+  .pill.sched{background:rgba(255,255,255,.08);color:var(--muted)}
+  .pill.late{background:rgba(255,181,71,.14);color:var(--late)}
+  .pill.cancel{background:rgba(255,93,108,.16);color:var(--bad)}
+  @keyframes pulse{50%{opacity:.3}}
+
+  .row{border-top:1px solid var(--line)} .row:first-child{border-top:0}
+  .row > button{display:grid;grid-template-columns:86px 1fr auto;gap:10px;align-items:center;padding:13px 14px;width:100%;text-align:left}
+  .row .t{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+  .row .t s{display:block;font-size:12px;color:var(--muted);font-weight:500}
+  .row .a{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .b{font-size:13px;color:var(--muted);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .row .in{text-align:right;font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+  .row .in small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+  .row.cx .t,.row.cx .a{text-decoration:line-through;color:var(--muted)}
+
+  /* stopping pattern */
+  .pat{padding:4px 16px 14px 22px}
+  .ps{display:grid;grid-template-columns:18px 1fr auto;gap:10px;align-items:center;position:relative;padding:5px 0;font-size:14px}
+  .ps::before{content:"";position:absolute;left:8px;top:0;bottom:0;width:2px;background:var(--line)}
+  .ps:first-child::before{top:50%} .ps:last-child::before{bottom:50%}
+  .ps i{width:12px;height:12px;border-radius:50%;background:var(--card);border:2px solid var(--muted);position:relative;z-index:1;margin-left:3px}
+  .ps.past{color:var(--muted)} .ps.past i{background:var(--muted);border-color:var(--muted)}
+  .ps.here i{background:var(--accent);border-color:var(--accent)} .ps.here{font-weight:700}
+  .ps .tm{font-variant-numeric:tabular-nums;color:var(--muted)} .ps .tm b{color:var(--late);font-weight:600}
+  .ps.trainpos{color:var(--ok);font-size:13px;font-weight:600}
+  .ps.trainpos i{border:0;background:none;width:18px;height:18px;margin:0;display:grid;place-items:center;font-style:normal}
+
+  .foot{margin-top:18px;text-align:center;color:var(--muted);font-size:12px}
+  .skel{height:150px;border-radius:24px;margin-top:16px;background:linear-gradient(90deg,var(--card) 0%,var(--card2) 50%,var(--card) 100%);background-size:200% 100%;animation:sk 1.2s infinite}
+  @keyframes sk{to{background-position:-200% 0}}
+
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:.2s;z-index:10}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;left:0;right:0;bottom:0;max-width:560px;margin:0 auto;background:#16121d;border-radius:22px 22px 0 0;
+    padding:10px 16px calc(env(safe-area-inset-bottom) + 20px);transform:translateY(105%);transition:transform .25s ease;z-index:11;max-height:88vh;overflow:auto;visibility:hidden}
+  .sheet.on{transform:none;visibility:visible}
+  .grab{width:40px;height:5px;border-radius:3px;background:#3a3446;margin:0 auto 12px}
+  .sheet h3{margin:0 0 12px;font-size:20px}
+  .field{display:block;margin-bottom:12px} .field small{display:block;color:var(--muted);font-size:13px;margin:0 0 6px 2px}
+  input{width:100%;font:inherit;font-size:17px;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;outline:none}
+  input:focus{border-color:var(--accent)}
+  .btn{display:block;width:100%;padding:14px;border-radius:14px;background:var(--accent2);color:#fff;font-weight:650;margin-top:8px}
+  .btn.ghost{background:var(--card);color:var(--text)}
+  .note{font-size:13px;color:var(--muted);margin:10px 2px}
+  .msg{font-size:14px;margin-top:10px} .msg.ok{color:var(--ok)} .msg.bad{color:var(--bad)}
+  .toggle{display:flex;align-items:center;justify-content:space-between;padding:12px 2px;border-top:1px solid var(--line);margin-top:6px}
+  .toggle input{width:auto;transform:scale(1.3)}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>Geelong Line<small id="sub">V/Line · Southern Cross ↔ Waurn Ponds</small></h1>
+  <div style="display:flex;gap:8px">
+    <button class="iconbtn" id="refreshBtn" aria-label="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button>
+    <button class="iconbtn" id="settingsBtn" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></button>
+  </div>
+</div>
+
+<div class="seg" id="modeSeg">
+  <button data-m="live">Live</button>
+  <button data-m="tt">Timetable</button>
+</div>
+
+<div class="station">
+  <small>Station</small>
+  <div class="nm" id="stName">Loading…</div>
+  <select id="stSel" aria-label="Choose station"></select>
+</div>
+
+<div class="seg small dir" id="dirSeg"></div>
+
+<div id="alerts"></div>
+<div id="main"></div>
+<div class="foot" id="foot"></div>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="setSheet">
+  <div class="grab"></div>
+  <h3>Settings</h3>
+  <label class="field"><small>PTV Developer ID</small><input id="devId" inputmode="numeric" autocomplete="off"></label>
+  <label class="field"><small>PTV API Key</small><input id="apiKey" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+  <p class="note">Free key: email <b>APIKeyRequest@ptv.vic.gov.au</b> with the subject <b>“PTV Timetable API – request for key”</b>. Your key is stored only on this phone.</p>
+  <div class="toggle"><span>Demo mode (sample data)</span><input type="checkbox" id="demoToggle"></div>
+  <button class="btn" id="saveSet">Save &amp; test connection</button>
+  <div class="msg" id="setMsg"></div>
+  <button class="btn ghost" id="closeSet">Close</button>
+</div>
+
+<script>
+(() => {
+'use strict';
+const BASE = 'https://timetableapi.ptv.vic.gov.au';
+const RT = 3;                         // PTV route_type 3 = V/Line
+const TZ = 'Australia/Melbourne';
+const LIVE_REFRESH = 30000;
+// Geelong line stations, Melbourne end first (used for ordering and demo mode)
+const LINE = ['Southern Cross','Footscray','Sunshine','Deer Park','Tarneit','Wyndham Vale','Little River','Lara','Corio','North Shore','North Geelong','Geelong','South Geelong','Marshall','Waurn Ponds'];
+const RUNTIME = [0,7,13,21,28,33,41,48,52,55,58,62,65,70,75]; // demo minutes from Southern Cross
+const $ = id => document.getElementById(id);
+
+/* ---------- state ---------- */
+const store = {
+  get(k,d){ try{ const v = localStorage.getItem('gl.'+k); return v==null ? d : JSON.parse(v); }catch{ return d; } },
+  set(k,v){ try{ localStorage.setItem('gl.'+k, JSON.stringify(v)); }catch{} }
+};
+let cfg = store.get('cfg', { devId:'', key:'', demo:false });
+let st = store.get('st', { mode:'live', stationName:'Tarneit', dir:'up' }); // up = to Melbourne, down = to Geelong
+let line = null;          // { routeId, stops:[{id,name}], dirs:{up:id, down:id, names} }
+let data = null, loading = false, lastErr = null, lastUpdated = null, pages = 0;
+let openRun = null, patterns = {};
+const isDemo = () => cfg.demo || !(cfg.devId && cfg.key);
+const save = () => store.set('st', st);
+
+/* ---------- PTV API (HMAC-SHA1 signed) ---------- */
+let ck = null, ckFor = '';
+async function sign(path){
+  if (ckFor !== cfg.key){
+    ck = await crypto.subtle.importKey('raw', new TextEncoder().encode(cfg.key), {name:'HMAC', hash:'SHA-1'}, false, ['sign']);
+    ckFor = cfg.key;
+  }
+  const s = await crypto.subtle.sign('HMAC', ck, new TextEncoder().encode(path));
+  return [...new Uint8Array(s)].map(b => b.toString(16).padStart(2,'0')).join('').toUpperCase();
+}
+async function api(path){
+  path += (path.includes('?') ? '&' : '?') + 'devid=' + encodeURIComponent(cfg.devId);
+  const r = await fetch(BASE + path + '&signature=' + await sign(path), { cache:'no-store' });
+  if (!r.ok){ let m = 'HTTP ' + r.status; try{ const j = await r.json(); if (j.message) m = j.message; }catch{} throw new Error(m); }
+  return r.json();
+}
+
+/* ---------- helpers ---------- */
+const clean = n => String(n||'').replace(/\s+(Railway\s+)?Station.*$/i,'').trim();
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = d => d.toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit',timeZone:TZ}).replace(/\s?(am|pm)/i, m => m.trim().toLowerCase());
+const dayKey = d => d.toLocaleDateString('en-AU',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'});
+const dayLabel = d => { const k = dayKey(d); if (k === dayKey(new Date())) return 'Today'; if (k === dayKey(new Date(Date.now()+864e5))) return 'Tomorrow';
+  return d.toLocaleDateString('en-AU',{timeZone:TZ,weekday:'long',day:'numeric',month:'short'}); };
+const mins = d => Math.round((d - Date.now())/60000);
+const lineIdx = name => { const i = LINE.findIndex(n => clean(name).toLowerCase() === n.toLowerCase()); return i < 0 ? 999 : i; };
+
+/* ---------- Geelong line setup ---------- */
+async function loadLine(){
+  if (isDemo()){
+    line = { routeId:1, stops: LINE.map((n,i) => ({ id:9000+i, name:n })), dirs:{ up:1, down:2, names:{1:'Southern Cross',2:'Waurn Ponds'} } };
+    return;
+  }
+  const cached = store.get('line', null);
+  if (cached && cached.devId === cfg.devId && Date.now() - cached.at < 7*864e5){ line = cached.line; return; }
+  const r = await api(`/v3/routes?route_types=${RT}&route_name=Geelong`);
+  const route = (r.routes || []).find(x => /^geelong/i.test(x.route_name) && !/coach/i.test(x.route_name)) || (r.routes||[])[0];
+  if (!route) throw new Error('Could not find the Geelong line in PTV data.');
+  const [stops, dirs] = await Promise.all([
+    api(`/v3/stops/route/${route.route_id}/route_type/${RT}`),
+    api(`/v3/directions/route/${route.route_id}`)
+  ]);
+  const list = (stops.stops || []).map(s => ({ id:s.stop_id, name:clean(s.stop_name) }))
+    .sort((a,b) => lineIdx(a.name) - lineIdx(b.name) || a.name.localeCompare(b.name));
+  const ds = dirs.directions || [];
+  const upD = ds.find(d => /southern cross|melbourne|city/i.test(d.direction_name)) || ds[0];
+  const downD = ds.find(d => d !== upD) || ds[1];
+  line = { routeId: route.route_id, routeName: route.route_name, stops: list,
+    dirs: { up: upD && upD.direction_id, down: downD && downD.direction_id,
+            names: Object.fromEntries(ds.map(d => [d.direction_id, d.direction_name])) } };
+  store.set('line', { devId: cfg.devId, at: Date.now(), line });
+}
+const station = () => line && (line.stops.find(s => s.name.toLowerCase() === st.stationName.toLowerCase()) || line.stops.find(s => /tarneit/i.test(s.name)) || line.stops[0]);
+
+/* ---------- departures ---------- */
+async function loadDeps(){
+  const s = station(); if (!s) return null;
+  const dirId = line.dirs[st.dir];
+  if (isDemo()) return demoDeps(s, dirId);
+  const n = st.mode === 'tt' ? 20 + pages*20 : 8 + pages*8;
+  const q = `/v3/departures/route_type/${RT}/stop/${s.id}/route/${line.routeId}?direction_id=${dirId}&max_results=${n}` +
+            `&include_cancelled=true&expand=Run&expand=Direction&expand=Disruption&expand=VehicleDescriptor`;
+  const r = await api(q);
+  const now = Date.now();
+  const deps = (r.departures || []).map(d => {
+    const sched = new Date(d.scheduled_departure_utc);
+    const est = d.estimated_departure_utc ? new Date(d.estimated_departure_utc) : null;
+    const run = (r.runs || {})[d.run_ref] || (r.runs || {})[d.run_id] || {};
+    return { ref: d.run_ref || String(d.run_id), sched, est, when: (st.mode === 'live' && est) || sched,
+      plat: d.platform_number, run, dest: run.destination_name || (r.directions||{})[d.direction_id]?.direction_name || '',
+      cx: /cancel/i.test(run.status || '') || /cancel/i.test(d.flags || '') };
+  }).filter(x => x.when.getTime() > now - 60000).sort((a,b) => a.when - b.when);
+  const seen = new Set();
+  const list = deps.filter(x => !seen.has(x.ref) && seen.add(x.ref));
+  const dis = Object.values(r.disruptions || {}).filter(z => z.display_status !== false && /current/i.test(z.disruption_status || 'Current')).slice(0,4);
+  return { list, dis, more: (r.departures||[]).length >= n };
+}
+
+function demoDeps(s, dirId){
+  const up = dirId === line.dirs.up;
+  const idx = LINE.indexOf(s.name);
+  const now = new Date(); now.setSeconds(0,0);
+  const list = [];
+  const off = up ? (RUNTIME[14] - RUNTIME[idx]) : RUNTIME[idx];
+  const start = new Date(now.getTime() - 120*60000);
+  for (let k = 0; list.length < (st.mode==='tt' ? 24 : 8); k++){
+    const base = new Date(start.getTime() + k*20*60000);
+    base.setMinutes(Math.floor(base.getMinutes()/20)*20 + 4);
+    const sched = new Date(base.getTime() + off*60000);
+    if (sched < now) continue;
+    const realtime = st.mode === 'live' && (sched - now) < 100*60000;
+    const delay = [3,0,0,6,0,1,0,0][list.length % 8];
+    const est = realtime ? new Date(sched.getTime() + delay*60000) : null;
+    list.push({ ref:'demo'+k+(up?'u':'d'), sched, est, when: (st.mode==='live' && est) || sched,
+      plat: s.name === 'Southern Cross' ? String(1 + (k%2)) : (up ? '1' : '2'),
+      run:{ vehicle_descriptor:{ description: k%2 ? 'VLocity 3 car' : 'VLocity 6 car' } },
+      dest: up ? 'Southern Cross' : (k%3 ? 'Waurn Ponds' : 'Geelong'), cx: list.length === 3, demoBase: base, up });
+  }
+  return { list, dis:[{ title:'Sample disruption: buses replace trains Geelong – Waurn Ponds on Sunday', description:'This is demo data. Add your PTV API key in Settings for live departures and real disruptions.' }], more:false };
+}
+
+async function loadPattern(x){
+  if (x.demoBase){
+    const order = x.up ? LINE.map((n,i)=>i).reverse() : LINE.map((n,i)=>i);
+    const endIdx = x.up ? 0 : (x.dest === 'Geelong' ? 11 : 14);
+    const delay = x.est ? (x.est - x.sched) : 0;
+    const stops = [];
+    for (const i of order){
+      const t = new Date(x.demoBase.getTime() + (x.up ? RUNTIME[14]-RUNTIME[i] : RUNTIME[i])*60000);
+      stops.push({ name: LINE[i], sched:t, est: x.est ? new Date(t.getTime()+delay) : null, plat:null });
+      if (i === endIdx) break;
+    }
+    return stops;
+  }
+  const r = await api(`/v3/pattern/run/${encodeURIComponent(x.ref)}/route_type/${RT}?expand=Stop`);
+  return (r.departures || []).map(d => ({ name: clean((r.stops||{})[d.stop_id]?.stop_name || ''), stopId: d.stop_id,
+      sched: new Date(d.scheduled_departure_utc), est: d.estimated_departure_utc ? new Date(d.estimated_departure_utc) : null, plat: d.platform_number }))
+    .sort((a,b) => a.sched - b.sched);
+}
+
+/* ---------- render ---------- */
+function pill(x){
+  if (x.cx) return '<span class="pill cancel">Cancelled</span>';
+  if (!x.est) return '<span class="pill sched">Scheduled</span>';
+  const d = Math.round((x.est - x.sched)/60000);
+  return d >= 2 ? `<span class="pill late">${d} min late</span>` : '<span class="pill live">On time</span>';
+}
+function renderControls(){
+  document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.m === st.mode));
+  const s = station();
+  $('stName').textContent = s ? s.name : 'Loading…';
+  if (line){
+    $('stSel').innerHTML = line.stops.map(x => `<option ${s && x.id===s.id ? 'selected':''}>${esc(x.name)}</option>`).join('');
+    const nm = id => clean(line.dirs.names[id] || '');
+    $('dirSeg').innerHTML = `<button data-d="up">To ${esc(nm(line.dirs.up) || 'Melbourne')}</button><button data-d="down">To ${esc(nm(line.dirs.down) || 'Geelong')}</button>`;
+    $('dirSeg').querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.d === st.dir); b.onclick = () => { st.dir = b.dataset.d; save(); reset(); }; });
+  }
+}
+function render(){
+  renderControls();
+  const al = [];
+  if (isDemo()) al.push(`<div class="banner info"><b>Demo mode</b>These are sample trains. Tap ⚙︎ and add your free PTV API key for real timetables and live data.</div>`);
+  if (lastErr) al.push(`<div class="banner err"><b>Couldn’t load data</b>${esc(lastErr)}</div>`);
+  if (data && st.mode === 'live') data.dis.forEach(z => al.push(`<div class="banner"><details><summary><b>⚠︎ ${esc(z.title)}</b>Tap for details</summary><div class="d">${esc(z.description||'')}${z.url?` <a href="${esc(z.url)}" target="_blank" rel="noopener">More</a>`:''}</div></details></div>`));
+  $('alerts').innerHTML = al.join('');
+
+  const m = $('main');
+  if (!data){ m.innerHTML = loading ? '<div class="skel"></div>' : ''; foot(); return; }
+  if (!data.list.length){ m.innerHTML = `<div class="list" style="margin-top:16px"><div class="empty">No upcoming trains from ${esc(station().name)} in this direction.</div></div>`; foot(); return; }
+  m.innerHTML = st.mode === 'tt' ? renderTT() : renderLive();
+  const mb = $('moreBtn'); if (mb) mb.onclick = () => { pages++; refresh(); };
+  m.querySelectorAll('[data-run]').forEach(b => b.onclick = () => toggleRun(b.dataset.run));
+  foot();
+}
+function renderTT(){
+  let h = '<h2>Upcoming trains</h2><div class="list">', lastDay = '';
+  data.list.forEach((x,i) => {
+    const dl = dayLabel(x.sched);
+    if (dl !== lastDay){ if (i || dl !== 'Today') h += `<div class="day">${esc(dl)}</div>`; lastDay = dl; }
+    h += `<div class="tt"><div class="t">${fmt(x.sched)}</div>
+      <div class="dst">${esc(clean(x.dest))}<small>${esc(x.run.vehicle_descriptor?.description || 'V/Line train')}</small></div>
+      <div class="pl">${x.plat ? `Plat<b>${esc(x.plat)}</b>` : ''}</div></div>`;
+  });
+  if (data.more) h += `<button class="more" id="moreBtn">Show more</button>`;
+  return h + '</div>';
+}
+function cdown(d){ const m = mins(d); if (m <= 0) return ['Now','']; if (m < 60) return [m,'min']; return [Math.floor(m/60)+'h', m%60 ? (m%60)+'m' : '']; }
+function renderLive(){
+  const first = data.list.find(x => !x.cx) || data.list[0];
+  const [n,u] = cdown(first.when);
+  const veh = first.run.vehicle_descriptor?.description;
+  let h = `<div class="hero" data-run="${esc(first.ref)}">
+    ${first.plat ? `<div class="plat"><small>Platform</small><b>${esc(first.plat)}</b></div>` : ''}
+    <div class="lbl">Next train · to ${esc(clean(first.dest))}</div>
+    <div class="big">${n}${u ? `<small>${u}</small>` : ''}</div>
+    <div>${pill(first)}</div>
+    <div class="meta"><span>Departs <b>${fmt(first.when)}</b>${first.est && Math.abs(first.est-first.sched) >= 120000 ? ` <s style="opacity:.6">${fmt(first.sched)}</s>` : ''}</span>${veh ? `<span>${esc(veh)}</span>` : ''}</div>
+    ${wherePill(first)}
+    ${openRun === first.ref ? patternHTML(first) : ''}
+  </div><h2>Following trains</h2><div class="list">`;
+  const rest = data.list.filter(x => x !== first);
+  if (!rest.length) h += `<div class="empty">No more trains found.</div>`;
+  rest.forEach(x => {
+    const m = mins(x.when), late = x.est ? Math.round((x.est - x.sched)/60000) : 0;
+    const v = x.run.vehicle_descriptor?.description;
+    h += `<div class="row${x.cx ? ' cx':''}"><button data-run="${esc(x.ref)}">
+      <div class="t">${fmt(x.when)}${late >= 2 ? `<s>${fmt(x.sched)}</s>` : ''}</div>
+      <div><div class="a">To ${esc(clean(x.dest))}</div><div class="b">${pill(x)}${x.plat ? `<span>Plat ${esc(x.plat)}</span>` : ''}${v ? `<span>${esc(v)}</span>` : ''}</div></div>
+      <div class="in">${x.cx ? '—' : m <= 0 ? 'Now' : m < 60 ? `${m}<small>min</small>` : `${Math.floor(m/60)}h ${m%60}<small>&nbsp;</small>`}</div>
+    </button>${openRun === x.ref ? patternHTML(x) : ''}</div>`;
+  });
+  if (data.more) h += `<button class="more" id="moreBtn">Show more</button>`;
+  return h + '</div>';
+}
+function trainPosition(p){
+  // p: pattern stops sorted. Returns index of last stop passed (-1 = not started)
+  const now = Date.now(); let last = -1;
+  p.forEach((s,i) => { if ((s.est || s.sched).getTime() <= now) last = i; });
+  return last;
+}
+function wherePill(x){
+  const p = patterns[x.ref];
+  if (!p || p === 'loading' || p.err) return `<div class="where" style="opacity:.75">Tap to see where this train is</div>`;
+  const i = trainPosition(p);
+  let txt;
+  if (i < 0) txt = `Not started yet · departs ${esc(p[0].name)} ${fmt(p[0].est || p[0].sched)}`;
+  else if (i >= p.length - 1) txt = `Arrived at ${esc(p[p.length-1].name)}`;
+  else txt = `Between ${esc(p[i].name)} and ${esc(p[i+1].name)}`;
+  return `<div class="where">${txt}</div>`;
+}
+function patternHTML(x){
+  const p = patterns[x.ref];
+  if (!p || p === 'loading') return `<div class="pat"><div class="note">Loading stops…</div></div>`;
+  if (p.err) return `<div class="pat"><div class="note">Couldn’t load stops: ${esc(p.err)}</div></div>`;
+  const pos = trainPosition(p), here = station();
+  let h = '<div class="pat">';
+  p.forEach((s,i) => {
+    const t = s.est || s.sched, late = s.est ? Math.round((s.est - s.sched)/60000) : 0;
+    const cls = [i <= pos ? 'past' : '', here && s.name.toLowerCase() === here.name.toLowerCase() ? 'here' : ''].join(' ');
+    h += `<div class="ps ${cls}"><i></i><span>${esc(s.name)}</span><span class="tm">${fmt(t)}${late >= 2 ? ` <b>+${late}</b>` : ''}</span></div>`;
+    if (i === pos && i < p.length - 1 && !x.cx) h += `<div class="ps trainpos"><i>🚆</i><span>Train is here${x.est ? '' : ' (by timetable)'}</span><span></span></div>`;
+  });
+  return h + '</div>';
+}
+async function toggleRun(ref){
+  if (openRun === ref){ openRun = null; render(); return; }
+  openRun = ref; await fetchPattern(ref);
+}
+async function fetchPattern(ref){
+  const x = data && data.list.find(y => y.ref === ref); if (!x) return;
+  if (!patterns[ref]) patterns[ref] = 'loading';
+  render();
+  try{ patterns[ref] = await loadPattern(x); }catch(e){ patterns[ref] = { err: e.message }; }
+  render();
+}
+function foot(){
+  $('foot').textContent = lastUpdated ? `Updated ${fmt(lastUpdated)}` + (st.mode === 'live' ? ' · auto-refreshes every 30s' : '') + (isDemo() ? ' · demo data' : ' · Data: PTV Timetable API') : '';
+}
+
+/* ---------- refresh ---------- */
+async function refresh(){
+  if (loading) return;
+  loading = true; $('refreshBtn').classList.add('spin'); render();
+  try{
+    if (!line) await loadLine();
+    data = await loadDeps(); lastErr = null; lastUpdated = new Date();
+    if (st.mode === 'live' && data.list.length){
+      const first = data.list.find(x => !x.cx) || data.list[0];
+      const refs = new Set([first.ref, openRun].filter(Boolean));
+      patterns = {};
+      await Promise.all([...refs].map(async r => { const x = data.list.find(y => y.ref === r); if (x) { try{ patterns[r] = await loadPattern(x); }catch(e){ patterns[r] = { err:e.message }; } } }));
+    }
+  }catch(e){ lastErr = e.message === 'Failed to fetch' ? 'Network error — check your connection and API key.' : e.message; }
+  loading = false; $('refreshBtn').classList.remove('spin'); render();
+}
+function reset(){ data = null; pages = 0; openRun = null; patterns = {}; refresh(); }
+
+setInterval(() => { if (st.mode === 'live' && document.visibilityState === 'visible') refresh(); }, LIVE_REFRESH);
+setInterval(() => { if (data && !loading && st.mode === 'live') render(); }, 15000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
+
+/* ---------- controls ---------- */
+document.querySelectorAll('#modeSeg button').forEach(b => b.onclick = () => { st.mode = b.dataset.m; save(); reset(); });
+$('stSel').onchange = e => { st.stationName = e.target.value; save(); reset(); };
+$('refreshBtn').onclick = () => refresh();
+function openSheet(){ $('scrim').classList.add('on'); $('setSheet').classList.add('on'); }
+function closeSheet(){ $('scrim').classList.remove('on'); $('setSheet').classList.remove('on'); }
+$('scrim').onclick = closeSheet; $('closeSet').onclick = closeSheet;
+$('settingsBtn').onclick = () => { $('devId').value = cfg.devId; $('apiKey').value = cfg.key; $('demoToggle').checked = !!cfg.demo; $('setMsg').textContent=''; openSheet(); };
+$('saveSet').onclick = async () => {
+  cfg = { devId: $('devId').value.trim(), key: $('apiKey').value.trim(), demo: $('demoToggle').checked };
+  store.set('cfg', cfg); line = null; store.set('line', null);
+  const msg = $('setMsg');
+  if (isDemo()){ msg.className = 'msg'; msg.textContent = 'Demo mode on.'; reset(); setTimeout(closeSheet, 700); return; }
+  msg.className = 'msg'; msg.textContent = 'Testing…';
+  try{ await api('/v3/route_types'); msg.className = 'msg ok'; msg.textContent = '✓ Connected to PTV. Live data is on.'; reset(); setTimeout(closeSheet, 900); }
+  catch(e){ msg.className = 'msg bad'; msg.textContent = '✗ ' + (e.message === 'Failed to fetch' ? 'Could not reach PTV.' : e.message) + ' Check your Developer ID and key.'; }
+};
+
+refresh();
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
