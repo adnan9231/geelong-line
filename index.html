@@ -126,15 +126,36 @@
   .msg{font-size:14px;margin-top:10px} .msg.ok{color:var(--ok)} .msg.bad{color:var(--bad)}
   .toggle{display:flex;align-items:center;justify-content:space-between;padding:12px 2px;border-top:1px solid var(--line);margin-top:6px}
   .toggle input{width:auto;transform:scale(1.3)}
+
+  .trip{margin-top:12px;background:var(--card);border-radius:var(--r);padding:4px 6px 4px 16px;display:flex;align-items:center;gap:10px}
+  .trip .stops{flex:1;min-width:0}
+  .sp{position:relative;padding:9px 0}
+  .sp small{display:block;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+  .sp .nm{font-size:20px;font-weight:700;display:flex;align-items:center;gap:6px;white-space:nowrap}
+  .sp .nm::after{content:"";width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translateY(-3px);margin-left:4px}
+  .sp select{position:absolute;inset:0;opacity:0;width:100%;font-size:16px}
+  .trip hr{border:0;border-top:1px solid var(--line);margin:0}
+  .swap{width:48px;height:48px;border-radius:14px;background:var(--card2);display:grid;place-items:center;flex:none}
+  .swap svg{width:22px;height:22px;stroke:var(--accent)}
+  .chips{display:flex;gap:8px;overflow-x:auto;margin:12px -16px 0;padding:0 16px 2px;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:none;background:var(--card);border-radius:999px;padding:8px 14px;font-size:14px;color:var(--muted);white-space:nowrap;display:flex;align-items:center;gap:8px}
+  .chip.on{background:var(--accent2);color:#fff}
+  .chip.add{color:var(--accent)}
+  .chip .x{opacity:.7;font-size:16px;line-height:1}
+  .tt .arr{font-size:15px} .tt .arr small{display:block;color:var(--muted);font-size:13px}
+  .stat{display:flex;justify-content:space-between;gap:12px;padding:11px 2px;border-top:1px solid var(--line);font-size:15px}
+  .stat span:last-child{color:var(--muted);text-align:right}
+  .pill.coach{background:rgba(120,170,255,.14);color:#9cc0ff}
 </style>
 </head>
 <body>
 
 <div class="top">
-  <h1>Geelong Line<small id="sub">V/Line · Southern Cross ↔ Waurn Ponds</small></h1>
+  <h1>Geelong Line<small>V/Line · Southern Cross ↔ Waurn Ponds</small></h1>
   <div style="display:flex;gap:8px">
     <button class="iconbtn" id="refreshBtn" aria-label="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button>
-    <button class="iconbtn" id="settingsBtn" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></button>
+    <button class="iconbtn" id="settingsBtn" aria-label="Info"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></button>
   </div>
 </div>
 
@@ -143,14 +164,16 @@
   <button data-m="tt">Timetable</button>
 </div>
 
-<div class="station">
-  <small>Station</small>
-  <div class="nm" id="stName">Loading…</div>
-  <select id="stSel" aria-label="Choose station"></select>
+<div class="trip">
+  <div class="stops">
+    <div class="sp"><small>From</small><div class="nm" id="fromName">…</div><select id="fromSel" aria-label="Departure station"></select></div>
+    <hr>
+    <div class="sp"><small>To</small><div class="nm" id="toName">…</div><select id="toSel" aria-label="Arrival station"></select></div>
+  </div>
+  <button class="swap" id="swapBtn" aria-label="Swap stations"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M7 4 3 8M7 4l4 4"/><path d="M17 20V4M17 20l-4-4M17 20l4-4"/></svg></button>
 </div>
 
-<div class="seg small dir" id="dirSeg"></div>
-
+<div class="chips" id="chips"></div>
 <div id="alerts"></div>
 <div id="main"></div>
 <div class="foot" id="foot"></div>
@@ -158,26 +181,21 @@
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="setSheet">
   <div class="grab"></div>
-  <h3>Settings</h3>
-  <label class="field"><small>PTV Developer ID</small><input id="devId" inputmode="numeric" autocomplete="off"></label>
-  <label class="field"><small>PTV API Key</small><input id="apiKey" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-  <p class="note">Free key: email <b>APIKeyRequest@ptv.vic.gov.au</b> with the subject <b>“PTV Timetable API – request for key”</b>. Your key is stored only on this phone.</p>
+  <h3>Data status</h3>
+  <div id="statusList"></div>
   <div class="toggle"><span>Demo mode (sample data)</span><input type="checkbox" id="demoToggle"></div>
-  <button class="btn" id="saveSet">Save &amp; test connection</button>
-  <div class="msg" id="setMsg"></div>
+  <p class="note">Timetable and live data: Transport Victoria Open Data (GTFS Schedule and GTFS Realtime), licensed under Creative Commons Attribution 4.0.</p>
   <button class="btn ghost" id="closeSet">Close</button>
 </div>
 
 <script>
 (() => {
 'use strict';
-const BASE = 'https://timetableapi.ptv.vic.gov.au';
-const RT = 3;                         // PTV route_type 3 = V/Line
+// ▼▼ Paste your Cloudflare Worker address between the quotes, e.g. 'https://geelong-line-api.yourname.workers.dev'
+const DATA_SERVER = '';
+// ▲▲ Without it, the app still shows the timetable, just not live times.
 const TZ = 'Australia/Melbourne';
 const LIVE_REFRESH = 30000;
-// Geelong line stations, Melbourne end first (used for ordering and demo mode)
-const LINE = ['Southern Cross','Footscray','Sunshine','Deer Park','Tarneit','Wyndham Vale','Little River','Lara','Corio','North Shore','North Geelong','Geelong','South Geelong','Marshall','Waurn Ponds'];
-const RUNTIME = [0,7,13,21,28,33,41,48,52,55,58,62,65,70,75]; // demo minutes from Southern Cross
 const $ = id => document.getElementById(id);
 
 /* ---------- state ---------- */
@@ -185,292 +203,349 @@ const store = {
   get(k,d){ try{ const v = localStorage.getItem('gl.'+k); return v==null ? d : JSON.parse(v); }catch{ return d; } },
   set(k,v){ try{ localStorage.setItem('gl.'+k, JSON.stringify(v)); }catch{} }
 };
-let cfg = store.get('cfg', { devId:'', key:'', demo:false });
-let st = store.get('st', { mode:'live', stationName:'Tarneit', dir:'up' }); // up = to Melbourne, down = to Geelong
-let line = null;          // { routeId, stops:[{id,name}], dirs:{up:id, down:id, names} }
-let data = null, loading = false, lastErr = null, lastUpdated = null, pages = 0;
-let openRun = null, patterns = {};
-const isDemo = () => cfg.demo || !(cfg.devId && cfg.key);
-const save = () => store.set('st', st);
-
-/* ---------- PTV API (HMAC-SHA1 signed) ---------- */
-let ck = null, ckFor = '';
-async function sign(path){
-  if (ckFor !== cfg.key){
-    ck = await crypto.subtle.importKey('raw', new TextEncoder().encode(cfg.key), {name:'HMAC', hash:'SHA-1'}, false, ['sign']);
-    ckFor = cfg.key;
-  }
-  const s = await crypto.subtle.sign('HMAC', ck, new TextEncoder().encode(path));
-  return [...new Uint8Array(s)].map(b => b.toString(16).padStart(2,'0')).join('').toUpperCase();
-}
-async function api(path){
-  path += (path.includes('?') ? '&' : '?') + 'devid=' + encodeURIComponent(cfg.devId);
-  const r = await fetch(BASE + path + '&signature=' + await sign(path), { cache:'no-store' });
-  if (!r.ok){ let m = 'HTTP ' + r.status; try{ const j = await r.json(); if (j.message) m = j.message; }catch{} throw new Error(m); }
-  return r.json();
-}
+let st = store.get('st2', { mode:'live', from:'Tarneit', to:'Southern Cross' });
+let saved = store.get('saved', [{ from:'Tarneit', to:'Southern Cross' }, { from:'Southern Cross', to:'Tarneit' }]);
+let demoPref = store.get('demo', false);
+let TT = null, ttDemo = false, ttErr = null;        // timetable
+let RT = null, rtAt = null, rtErr = null;           // realtime: Map trip_id -> update
+let data = null, loading = false, pages = 0, openRun = null, lastUpdated = null;
+const save = () => store.set('st2', st);
+const isDemo = () => demoPref || ttDemo;
 
 /* ---------- helpers ---------- */
-const clean = n => String(n||'').replace(/\s+(Railway\s+)?Station.*$/i,'').trim();
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = d => d.toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit',timeZone:TZ}).replace(/\s?(am|pm)/i, m => m.trim().toLowerCase());
 const dayKey = d => d.toLocaleDateString('en-AU',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'});
 const dayLabel = d => { const k = dayKey(d); if (k === dayKey(new Date())) return 'Today'; if (k === dayKey(new Date(Date.now()+864e5))) return 'Tomorrow';
   return d.toLocaleDateString('en-AU',{timeZone:TZ,weekday:'long',day:'numeric',month:'short'}); };
 const mins = d => Math.round((d - Date.now())/60000);
-const lineIdx = name => { const i = LINE.findIndex(n => clean(name).toLowerCase() === n.toLowerCase()); return i < 0 ? 999 : i; };
+const same = (a,b) => String(a).toLowerCase() === String(b).toLowerCase();
 
-/* ---------- Geelong line setup ---------- */
-async function loadLine(){
-  if (isDemo()){
-    line = { routeId:1, stops: LINE.map((n,i) => ({ id:9000+i, name:n })), dirs:{ up:1, down:2, names:{1:'Southern Cross',2:'Waurn Ponds'} } };
-    return;
-  }
-  const cached = store.get('line', null);
-  if (cached && cached.devId === cfg.devId && Date.now() - cached.at < 7*864e5){ line = cached.line; return; }
-  const r = await api(`/v3/routes?route_types=${RT}&route_name=Geelong`);
-  const route = (r.routes || []).find(x => /^geelong/i.test(x.route_name) && !/coach/i.test(x.route_name)) || (r.routes||[])[0];
-  if (!route) throw new Error('Could not find the Geelong line in PTV data.');
-  const [stops, dirs] = await Promise.all([
-    api(`/v3/stops/route/${route.route_id}/route_type/${RT}`),
-    api(`/v3/directions/route/${route.route_id}`)
-  ]);
-  const list = (stops.stops || []).map(s => ({ id:s.stop_id, name:clean(s.stop_name) }))
-    .sort((a,b) => lineIdx(a.name) - lineIdx(b.name) || a.name.localeCompare(b.name));
-  const ds = dirs.directions || [];
-  const upD = ds.find(d => /southern cross|melbourne|city/i.test(d.direction_name)) || ds[0];
-  const downD = ds.find(d => d !== upD) || ds[1];
-  line = { routeId: route.route_id, routeName: route.route_name, stops: list,
-    dirs: { up: upD && upD.direction_id, down: downD && downD.direction_id,
-            names: Object.fromEntries(ds.map(d => [d.direction_id, d.direction_name])) } };
-  store.set('line', { devId: cfg.devId, at: Date.now(), line });
+// Melbourne local time <-> real instants (handles daylight saving)
+const dtf = new Intl.DateTimeFormat('en-AU',{timeZone:TZ,hourCycle:'h23',year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric'});
+function parts(date){ const o = {}; dtf.formatToParts(date).forEach(p => o[p.type] = +p.value); return o; }
+function offsetMin(date){ const p = parts(date); return Math.round((Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute) - Math.floor(date.getTime()/60000)*60000)/60000); }
+function melb(ymd, minutes){
+  const y = Math.floor(ymd/10000), m = Math.floor(ymd/100)%100, d = ymd%100;
+  const wall = Date.UTC(y, m-1, d, 0, 0) + minutes*60000;
+  const t1 = wall - offsetMin(new Date(wall))*60000;
+  return new Date(wall - offsetMin(new Date(t1))*60000);
 }
-const station = () => line && (line.stops.find(s => s.name.toLowerCase() === st.stationName.toLowerCase()) || line.stops.find(s => /tarneit/i.test(s.name)) || line.stops[0]);
+function todayYmd(){ const p = parts(new Date()); return p.year*10000 + p.month*100 + p.day; }
+function addDays(ymd, n){ const d = new Date(Date.UTC(Math.floor(ymd/10000), Math.floor(ymd/100)%100-1, ymd%100) + n*864e5);
+  return d.getUTCFullYear()*10000 + (d.getUTCMonth()+1)*100 + d.getUTCDate(); }
 
-/* ---------- departures ---------- */
-async function loadDeps(){
-  const s = station(); if (!s) return null;
-  const dirId = line.dirs[st.dir];
-  if (isDemo()) return demoDeps(s, dirId);
-  const n = st.mode === 'tt' ? 20 + pages*20 : 8 + pages*8;
-  const q = `/v3/departures/route_type/${RT}/stop/${s.id}/route/${line.routeId}?direction_id=${dirId}&max_results=${n}` +
-            `&include_cancelled=true&expand=Run&expand=Direction&expand=Disruption&expand=VehicleDescriptor`;
-  const r = await api(q);
+/* ---------- timetable ---------- */
+async function loadTimetable(){
+  if (TT && !ttDemo && !demoPref) return;
+  ttDemo = false; ttErr = null;
+  if (demoPref){ TT = demoTimetable(); return; }
+  try{
+    const r = await fetch('timetable.json', { cache:'no-cache' });
+    if (!r.ok) throw new Error(r.status === 404 ? 'timetable.json not found yet' : 'HTTP ' + r.status);
+    TT = await r.json();
+  }catch(e){ ttErr = e.message; ttDemo = true; TT = demoTimetable(); }
+  prepTT();
+}
+function prepTT(){
+  TT.svcSets = TT.services.map(a => new Set(a));
+  TT.trips.forEach(t => { t.pos = new Map(); t[4].forEach((s,k) => { if (!t.pos.has(s[0])) t.pos.set(s[0], k); }); });
+}
+const stIdx = name => TT.stations.findIndex(n => same(n, name));
+
+function journeys(fromName, toName, horizonDays){
+  const a = stIdx(fromName), b = stIdx(toName), out = [];
+  if (a < 0 || b < 0 || a === b) return out;
+  const t0 = todayYmd();
+  for (let k = -1; k <= horizonDays; k++){
+    const day = addDays(t0, k);
+    TT.trips.forEach(t => {
+      if (!TT.svcSets[t[1]].has(day)) return;
+      const i = t.pos.get(a), j = t.pos.get(b);
+      if (i === undefined || j === undefined || j <= i) return;
+      out.push({ t, id: t[0], day, i, j, sched: melb(day, t[4][i][1]), arrSched: melb(day, t[4][j][1]),
+        plat: t[4][i][3], head: t[2], coach: !!t[3] });
+    });
+  }
+  return out.sort((x,y) => x.sched - y.sched);
+}
+
+/* ---------- realtime (GTFS-R protobuf, decoded here) ---------- */
+function pb(buf){
+  let p = 0;
+  const varint = () => { let r = 0n, s = 0n, b; do { b = buf[p++]; r |= BigInt(b & 0x7f) << s; s += 7n; } while (b & 0x80); return r; };
+  const fields = (end, cb) => { while (p < end){ const key = Number(varint()), f = key >> 3, w = key & 7;
+    if (w === 0) cb(f, 0, varint());
+    else if (w === 2){ const len = Number(varint()), s = p; p += len; cb(f, 2, s, s+len); }
+    else if (w === 1){ p += 8; } else if (w === 5){ p += 4; } else throw new Error('bad protobuf'); } };
+  const str = (s,e) => new TextDecoder().decode(buf.subarray(s,e));
+  const sub = (s, e, fn) => { const save = p; p = s; fn(e); p = save; };
+  const map = new Map();
+  fields(buf.length, (f, w, a, b) => {
+    if (f !== 2 || w !== 2) return;                         // FeedMessage.entity
+    sub(a, b, end => fields(end, (f2, w2, a2, b2) => {
+      if (f2 !== 3 || w2 !== 2) return;                     // FeedEntity.trip_update
+      const tu = { id:null, date:null, cancelled:false, stops:[] };
+      sub(a2, b2, end2 => fields(end2, (f3, w3, a3, b3) => {
+        if (f3 === 1 && w3 === 2) sub(a3, b3, e => fields(e, (f4, w4, a4, b4) => {   // TripDescriptor
+          if (f4 === 1) tu.id = str(a4, b4);
+          else if (f4 === 3) tu.date = +str(a4, b4);
+          else if (f4 === 4 && w4 === 0) tu.cancelled = Number(a4) === 3;
+        }));
+        else if (f3 === 2 && w3 === 2){                      // StopTimeUpdate
+          const u = { seq:null, stop:null, skip:false };
+          sub(a3, b3, e => fields(e, (f4, w4, a4, b4) => {
+            if (f4 === 1 && w4 === 0) u.seq = Number(a4);
+            else if ((f4 === 2 || f4 === 3) && w4 === 2){
+              const ev = {};
+              sub(a4, b4, e2 => fields(e2, (f5, w5, v) => {
+                if (f5 === 1 && w5 === 0) ev.delay = Number(BigInt.asIntN(32, v));
+                else if (f5 === 2 && w5 === 0) ev.time = Number(BigInt.asIntN(64, v));
+              }));
+              u[f4 === 2 ? 'arr' : 'dep'] = ev;
+            }
+            else if (f4 === 4 && w4 === 2) u.stop = str(a4, b4);
+            else if (f4 === 5 && w4 === 0) u.skip = Number(a4) === 1;
+          }));
+          tu.stops.push(u);
+        }
+      }));
+      if (tu.id) map.set(tu.id, tu);
+    }));
+  });
+  return map;
+}
+async function loadRealtime(){
+  rtErr = null;
+  if (isDemo()){ RT = demoRealtime(); rtAt = new Date(); return; }
+  if (!DATA_SERVER){ RT = null; return; }
+  try{
+    const r = await fetch(DATA_SERVER.replace(/\/+$/,'') + '/realtime', { cache:'no-store' });
+    if (!r.ok){ let m = 'HTTP ' + r.status; try{ const j = await r.json(); if (j.message) m = j.message; }catch{} throw new Error(m); }
+    RT = pb(new Uint8Array(await r.arrayBuffer())); rtAt = new Date();
+  }catch(e){ rtErr = e.message === 'Failed to fetch' ? 'Can’t reach the live data server.' : e.message; }
+}
+// live estimates for every stop of one journey's train
+function applyRT(x){
+  x.stopsRT = null; x.est = null; x.arrEst = null; x.cx = false; x.skipFrom = x.skipTo = false; x.live = false;
+  if (!RT) return;
+  const u = RT.get(x.id);
+  if (!u || (u.date && u.date !== x.day)) return;
+  x.live = true; x.cx = u.cancelled;
+  const stops = x.t[4], est = new Array(stops.length).fill(null), skip = new Array(stops.length).fill(false);
+  let delay = null;
+  stops.forEach((s, k) => {
+    const upd = u.stops.find(v => (v.stop != null && TT.stopIds && TT.stopIds[v.stop] === s[0]) || (v.seq != null && v.seq === s[2]));
+    const sched = melb(x.day, s[1]);
+    if (upd){
+      if (upd.skip){ skip[k] = true; return; }
+      const ev = upd.dep || upd.arr || {};
+      if (ev.time){ est[k] = new Date(ev.time*1000); delay = (est[k] - sched)/1000; }
+      else if (ev.delay != null){ delay = ev.delay; est[k] = new Date(sched.getTime() + delay*1000); }
+      else if (delay != null) est[k] = new Date(sched.getTime() + delay*1000);
+    } else if (delay != null) est[k] = new Date(sched.getTime() + delay*1000);
+  });
+  x.stopsRT = { est, skip };
+  x.est = est[x.i]; x.arrEst = est[x.j]; x.skipFrom = skip[x.i]; x.skipTo = skip[x.j];
+  if (x.skipFrom || x.skipTo) x.cx = true;
+}
+
+/* ---------- demo data ---------- */
+function demoTimetable(){
+  const LINE = ['Southern Cross','Footscray','Sunshine','Deer Park','Tarneit','West Tarneit','Wyndham Vale','Little River','Lara','Corio','North Shore','North Geelong','Geelong','South Geelong','Marshall','Waurn Ponds'];
+  const RTm = [0,7,13,21,28,31,34,41,48,52,55,58,62,65,70,75];
+  const t0 = todayYmd(), days = [-1,0,1,2,3].map(k => addDays(t0, k));
+  const trips = []; let k = 0;
+  for (let s = 5*60; s < 24*60; s += 20) for (const up of [true,false]){
+    k++; const endG = !up && k % 3 === 0;
+    const idx = up ? [...Array(16).keys()].reverse() : [...Array(endG ? 13 : 16).keys()];
+    trips.push(['demo'+k, 0, up ? 'Southern Cross' : (endG ? 'Geelong' : 'Waurn Ponds'), k % 23 === 0 ? 1 : 0,
+      idx.map((i, q) => [i, s + (up ? RTm[15]-RTm[i] : RTm[i]), q+1, up ? '1' : '2'])]);
+  }
+  return { generated: new Date().toISOString(), from: days[0], to: days[4], stations: LINE, stopIds: {}, services: [days], trips, demo:true };
+}
+function demoRealtime(){
+  const m = new Map(), now = Date.now(), t0 = todayYmd(); let n = 0;
+  TT.trips.forEach(t => {
+    const dep = melb(t0, t[4][0][1]), end = melb(t0, t[4][t[4].length-1][1]);
+    if (end < now - 60*60000 || dep > now + 100*60000) return;
+    const d = [180, 0, 0, 360, 0, 60][n++ % 6];
+    m.set(t[0], { id:t[0], date:t0, cancelled: n === 4, stops:[{ seq:1, stop:null, dep:{ delay:d } }] });
+  });
+  return m;
+}
+
+/* ---------- build the list ---------- */
+function compute(){
+  if (!TT) return null;
+  const live = st.mode === 'live';
+  const want = live ? 8 + pages*8 : 20 + pages*20;
   const now = Date.now();
-  const deps = (r.departures || []).map(d => {
-    const sched = new Date(d.scheduled_departure_utc);
-    const est = d.estimated_departure_utc ? new Date(d.estimated_departure_utc) : null;
-    const run = (r.runs || {})[d.run_ref] || (r.runs || {})[d.run_id] || {};
-    return { ref: d.run_ref || String(d.run_id), sched, est, when: (st.mode === 'live' && est) || sched,
-      plat: d.platform_number, run, dest: run.destination_name || (r.directions||{})[d.direction_id]?.direction_name || '',
-      cx: /cancel/i.test(run.status || '') || /cancel/i.test(d.flags || '') };
-  }).filter(x => x.when.getTime() > now - 60000).sort((a,b) => a.when - b.when);
-  const seen = new Set();
-  const list = deps.filter(x => !seen.has(x.ref) && seen.add(x.ref));
-  const dis = Object.values(r.disruptions || {}).filter(z => z.display_status !== false && /current/i.test(z.disruption_status || 'Current')).slice(0,4);
-  return { list, dis, more: (r.departures||[]).length >= n };
-}
-
-function demoDeps(s, dirId){
-  const up = dirId === line.dirs.up;
-  const idx = LINE.indexOf(s.name);
-  const now = new Date(); now.setSeconds(0,0);
-  const list = [];
-  const off = up ? (RUNTIME[14] - RUNTIME[idx]) : RUNTIME[idx];
-  const start = new Date(now.getTime() - 120*60000);
-  for (let k = 0; list.length < (st.mode==='tt' ? 24 : 8); k++){
-    const base = new Date(start.getTime() + k*20*60000);
-    base.setMinutes(Math.floor(base.getMinutes()/20)*20 + 4);
-    const sched = new Date(base.getTime() + off*60000);
-    if (sched < now) continue;
-    const realtime = st.mode === 'live' && (sched - now) < 100*60000;
-    const delay = [3,0,0,6,0,1,0,0][list.length % 8];
-    const est = realtime ? new Date(sched.getTime() + delay*60000) : null;
-    list.push({ ref:'demo'+k+(up?'u':'d'), sched, est, when: (st.mode==='live' && est) || sched,
-      plat: s.name === 'Southern Cross' ? String(1 + (k%2)) : (up ? '1' : '2'),
-      run:{ vehicle_descriptor:{ description: k%2 ? 'VLocity 3 car' : 'VLocity 6 car' } },
-      dest: up ? 'Southern Cross' : (k%3 ? 'Waurn Ponds' : 'Geelong'), cx: list.length === 3, demoBase: base, up });
-  }
-  return { list, dis:[{ title:'Sample disruption: buses replace trains Geelong – Waurn Ponds on Sunday', description:'This is demo data. Add your PTV API key in Settings for live departures and real disruptions.' }], more:false };
-}
-
-async function loadPattern(x){
-  if (x.demoBase){
-    const order = x.up ? LINE.map((n,i)=>i).reverse() : LINE.map((n,i)=>i);
-    const endIdx = x.up ? 0 : (x.dest === 'Geelong' ? 11 : 14);
-    const delay = x.est ? (x.est - x.sched) : 0;
-    const stops = [];
-    for (const i of order){
-      const t = new Date(x.demoBase.getTime() + (x.up ? RUNTIME[14]-RUNTIME[i] : RUNTIME[i])*60000);
-      stops.push({ name: LINE[i], sched:t, est: x.est ? new Date(t.getTime()+delay) : null, plat:null });
-      if (i === endIdx) break;
-    }
-    return stops;
-  }
-  const r = await api(`/v3/pattern/run/${encodeURIComponent(x.ref)}/route_type/${RT}?expand=Stop`);
-  return (r.departures || []).map(d => ({ name: clean((r.stops||{})[d.stop_id]?.stop_name || ''), stopId: d.stop_id,
-      sched: new Date(d.scheduled_departure_utc), est: d.estimated_departure_utc ? new Date(d.estimated_departure_utc) : null, plat: d.platform_number }))
-    .sort((a,b) => a.sched - b.sched);
+  const all = journeys(st.from, st.to, live ? 1 : 3 + pages*3);
+  all.forEach(x => { applyRT(x); x.when = (live && x.est) || x.sched; });
+  const list = all.filter(x => x.when.getTime() > now - 60000).sort((a,b) => a.when - b.when);
+  return { list: list.slice(0, want), more: list.length > want || !live };
 }
 
 /* ---------- render ---------- */
 function pill(x){
-  if (x.cx) return '<span class="pill cancel">Cancelled</span>';
-  if (!x.est) return '<span class="pill sched">Scheduled</span>';
+  if (x.cx) return `<span class="pill cancel">${x.skipFrom ? 'Not stopping here' : x.skipTo ? 'Not stopping at ' + esc(st.to) : 'Cancelled'}</span>`;
+  if (!x.live || !x.est) return '<span class="pill sched">Scheduled</span>';
   const d = Math.round((x.est - x.sched)/60000);
   return d >= 2 ? `<span class="pill late">${d} min late</span>` : '<span class="pill live">On time</span>';
 }
+const arrOf = (x, live) => (live && x.arrEst) || x.arrSched;
+const durOf = (x, live) => Math.round((arrOf(x, live) - ((live && x.est) || x.sched))/60000);
+const coachTag = x => x.coach ? '<span class="pill coach">Replacement coach</span>' : '';
+const tripKey = t => t.from.toLowerCase() + '>' + t.to.toLowerCase();
+
 function renderControls(){
   document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.m === st.mode));
-  const s = station();
-  $('stName').textContent = s ? s.name : 'Loading…';
-  if (line){
-    $('stSel').innerHTML = line.stops.map(x => `<option ${s && x.id===s.id ? 'selected':''}>${esc(x.name)}</option>`).join('');
-    const nm = id => clean(line.dirs.names[id] || '');
-    $('dirSeg').innerHTML = `<button data-d="up">To ${esc(nm(line.dirs.up) || 'Melbourne')}</button><button data-d="down">To ${esc(nm(line.dirs.down) || 'Geelong')}</button>`;
-    $('dirSeg').querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.d === st.dir); b.onclick = () => { st.dir = b.dataset.d; save(); reset(); }; });
+  $('fromName').textContent = st.from; $('toName').textContent = st.to;
+  if (TT){
+    const opts = sel => TT.stations.map(n => `<option ${same(n, sel) ? 'selected' : ''}>${esc(n)}</option>`).join('');
+    $('fromSel').innerHTML = opts(st.from); $('toSel').innerHTML = opts(st.to);
   }
+  const cur = tripKey(st);
+  let h = saved.map((t,i) => `<button class="chip${tripKey(t) === cur ? ' on' : ''}" data-i="${i}">${esc(t.from)} → ${esc(t.to)}${tripKey(t) === cur ? '<span class="x" data-del="'+i+'" aria-label="Remove">×</span>' : ''}</button>`).join('');
+  if (!saved.some(t => tripKey(t) === cur)) h += `<button class="chip add" id="saveTrip">☆ Save this trip</button>`;
+  $('chips').innerHTML = h;
+  $('chips').querySelectorAll('[data-i]').forEach(b => b.onclick = e => {
+    const del = e.target.closest('[data-del]');
+    if (del){ saved.splice(+del.dataset.del, 1); store.set('saved', saved); renderControls(); return; }
+    const t = saved[+b.dataset.i]; st.from = t.from; st.to = t.to; save(); reset();
+  });
+  const s = $('saveTrip'); if (s) s.onclick = () => { saved.push({ from: st.from, to: st.to }); store.set('saved', saved); renderControls(); };
 }
 function render(){
   renderControls();
   const al = [];
-  if (isDemo()) al.push(`<div class="banner info"><b>Demo mode</b>These are sample trains. Tap ⚙︎ and add your free PTV API key for real timetables and live data.</div>`);
-  if (lastErr) al.push(`<div class="banner err"><b>Couldn’t load data</b>${esc(lastErr)}</div>`);
-  if (data && st.mode === 'live') data.dis.forEach(z => al.push(`<div class="banner"><details><summary><b>⚠︎ ${esc(z.title)}</b>Tap for details</summary><div class="d">${esc(z.description||'')}${z.url?` <a href="${esc(z.url)}" target="_blank" rel="noopener">More</a>`:''}</div></details></div>`));
+  if (demoPref) al.push(`<div class="banner info"><b>Demo mode</b>Showing sample trains. Turn it off in ⚙︎.</div>`);
+  else if (ttDemo) al.push(`<div class="banner info"><b>Timetable not set up yet</b>Showing sample trains until the “Update timetable” GitHub Action has run (${esc(ttErr || '')}).</div>`);
+  if (st.mode === 'live' && !isDemo()){
+    if (!DATA_SERVER) al.push(`<div class="banner info"><b>Live times not connected</b>Showing timetabled times. Add your Cloudflare address to connect live data.</div>`);
+    else if (rtErr) al.push(`<div class="banner err"><b>Live data unavailable</b>${esc(rtErr)} Showing timetabled times.</div>`);
+  }
   $('alerts').innerHTML = al.join('');
 
   const m = $('main');
+  if (same(st.from, st.to)){ m.innerHTML = `<div class="list" style="margin-top:16px"><div class="empty">Pick two different stations.</div></div>`; foot(); return; }
   if (!data){ m.innerHTML = loading ? '<div class="skel"></div>' : ''; foot(); return; }
-  if (!data.list.length){ m.innerHTML = `<div class="list" style="margin-top:16px"><div class="empty">No upcoming trains from ${esc(station().name)} in this direction.</div></div>`; foot(); return; }
+  if (!data.list.length){ m.innerHTML = `<div class="list" style="margin-top:16px"><div class="empty">No upcoming trains from ${esc(st.from)} to ${esc(st.to)}.</div></div>`; foot(); return; }
   m.innerHTML = st.mode === 'tt' ? renderTT() : renderLive();
-  const mb = $('moreBtn'); if (mb) mb.onclick = () => { pages++; refresh(); };
-  m.querySelectorAll('[data-run]').forEach(b => b.onclick = () => toggleRun(b.dataset.run));
+  const mb = $('moreBtn'); if (mb) mb.onclick = () => { pages++; data = compute(); render(); };
+  m.querySelectorAll('[data-run]').forEach(b => b.onclick = () => { openRun = openRun === b.dataset.run ? null : b.dataset.run; render(); });
   foot();
 }
 function renderTT(){
-  let h = '<h2>Upcoming trains</h2><div class="list">', lastDay = '';
-  data.list.forEach((x,i) => {
+  let h = `<h2>${esc(st.from)} → ${esc(st.to)}</h2><div class="list">`, lastDay = '';
+  data.list.forEach((x,k) => {
     const dl = dayLabel(x.sched);
-    if (dl !== lastDay){ if (i || dl !== 'Today') h += `<div class="day">${esc(dl)}</div>`; lastDay = dl; }
+    if (dl !== lastDay){ if (k || dl !== 'Today') h += `<div class="day">${esc(dl)}</div>`; lastDay = dl; }
+    const between = x.j - x.i - 1;
     h += `<div class="tt"><div class="t">${fmt(x.sched)}</div>
-      <div class="dst">${esc(clean(x.dest))}<small>${esc(x.run.vehicle_descriptor?.description || 'V/Line train')}</small></div>
+      <div class="arr">Arr ${fmt(x.arrSched)}<small>${durOf(x,false)} min · ${between ? between + ' stop' + (between > 1 ? 's' : '') : 'direct'}${x.coach ? ' · coach' : ''}</small></div>
       <div class="pl">${x.plat ? `Plat<b>${esc(x.plat)}</b>` : ''}</div></div>`;
   });
   if (data.more) h += `<button class="more" id="moreBtn">Show more</button>`;
   return h + '</div>';
 }
 function cdown(d){ const m = mins(d); if (m <= 0) return ['Now','']; if (m < 60) return [m,'min']; return [Math.floor(m/60)+'h', m%60 ? (m%60)+'m' : '']; }
+const key = x => x.id + '@' + x.day;
 function renderLive(){
   const first = data.list.find(x => !x.cx) || data.list[0];
   const [n,u] = cdown(first.when);
-  const veh = first.run.vehicle_descriptor?.description;
-  let h = `<div class="hero" data-run="${esc(first.ref)}">
+  let h = `<div class="hero" data-run="${esc(key(first))}">
     ${first.plat ? `<div class="plat"><small>Platform</small><b>${esc(first.plat)}</b></div>` : ''}
-    <div class="lbl">Next train · to ${esc(clean(first.dest))}</div>
+    <div class="lbl">Next train to ${esc(st.to)}</div>
     <div class="big">${n}${u ? `<small>${u}</small>` : ''}</div>
-    <div>${pill(first)}</div>
-    <div class="meta"><span>Departs <b>${fmt(first.when)}</b>${first.est && Math.abs(first.est-first.sched) >= 120000 ? ` <s style="opacity:.6">${fmt(first.sched)}</s>` : ''}</span>${veh ? `<span>${esc(veh)}</span>` : ''}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">${pill(first)}${coachTag(first)}</div>
+    <div class="meta"><span>Departs <b>${fmt(first.when)}</b>${first.est && Math.abs(first.est-first.sched) >= 120000 ? ` <s style="opacity:.6">${fmt(first.sched)}</s>` : ''}</span>
+      <span>Arrives <b>${fmt(arrOf(first,true))}</b></span><span>${durOf(first,true)} min</span><span>to ${esc(first.head)}</span></div>
     ${wherePill(first)}
-    ${openRun === first.ref ? patternHTML(first) : ''}
+    ${openRun === key(first) ? patternHTML(first) : ''}
   </div><h2>Following trains</h2><div class="list">`;
   const rest = data.list.filter(x => x !== first);
   if (!rest.length) h += `<div class="empty">No more trains found.</div>`;
   rest.forEach(x => {
     const m = mins(x.when), late = x.est ? Math.round((x.est - x.sched)/60000) : 0;
-    const v = x.run.vehicle_descriptor?.description;
-    h += `<div class="row${x.cx ? ' cx':''}"><button data-run="${esc(x.ref)}">
+    h += `<div class="row${x.cx ? ' cx':''}"><button data-run="${esc(key(x))}">
       <div class="t">${fmt(x.when)}${late >= 2 ? `<s>${fmt(x.sched)}</s>` : ''}</div>
-      <div><div class="a">To ${esc(clean(x.dest))}</div><div class="b">${pill(x)}${x.plat ? `<span>Plat ${esc(x.plat)}</span>` : ''}${v ? `<span>${esc(v)}</span>` : ''}</div></div>
+      <div><div class="a">Arr ${fmt(arrOf(x,true))} · ${durOf(x,true)} min</div><div class="b">${pill(x)}${coachTag(x)}${x.plat ? `<span>Plat ${esc(x.plat)}</span>` : ''}</div></div>
       <div class="in">${x.cx ? '—' : m <= 0 ? 'Now' : m < 60 ? `${m}<small>min</small>` : `${Math.floor(m/60)}h ${m%60}<small>&nbsp;</small>`}</div>
-    </button>${openRun === x.ref ? patternHTML(x) : ''}</div>`;
+    </button>${openRun === key(x) ? patternHTML(x) : ''}</div>`;
   });
   if (data.more) h += `<button class="more" id="moreBtn">Show more</button>`;
   return h + '</div>';
 }
-function trainPosition(p){
-  // p: pattern stops sorted. Returns index of last stop passed (-1 = not started)
-  const now = Date.now(); let last = -1;
-  p.forEach((s,i) => { if ((s.est || s.sched).getTime() <= now) last = i; });
-  return last;
+function stopTimes(x){
+  return x.t[4].map((s,k) => ({ name: TT.stations[s[0]], sched: melb(x.day, s[1]),
+    est: x.stopsRT ? x.stopsRT.est[k] : null, skip: x.stopsRT ? x.stopsRT.skip[k] : false }));
 }
+function trainPosition(p){ const now = Date.now(); let last = -1; p.forEach((s,i) => { if (!s.skip && (s.est || s.sched).getTime() <= now) last = i; }); return last; }
 function wherePill(x){
-  const p = patterns[x.ref];
-  if (!p || p === 'loading' || p.err) return `<div class="where" style="opacity:.75">Tap to see where this train is</div>`;
-  const i = trainPosition(p);
-  let txt;
-  if (i < 0) txt = `Not started yet · departs ${esc(p[0].name)} ${fmt(p[0].est || p[0].sched)}`;
-  else if (i >= p.length - 1) txt = `Arrived at ${esc(p[p.length-1].name)}`;
-  else txt = `Between ${esc(p[i].name)} and ${esc(p[i+1].name)}`;
-  return `<div class="where">${txt}</div>`;
+  if (x.cx) return '';
+  const p = stopTimes(x), i = trainPosition(p);
+  const txt = i < 0 ? `Not started yet · leaves ${esc(p[0].name)} at ${fmt(p[0].est || p[0].sched)}`
+    : i >= p.length - 1 ? `Arrived at ${esc(p[p.length-1].name)}` : `Now between ${esc(p[i].name)} and ${esc(p[i+1].name)}${x.live ? '' : ' (by timetable)'}`;
+  return `<div class="where">${txt}${openRun === key(x) ? '' : ' · tap for stops'}</div>`;
 }
 function patternHTML(x){
-  const p = patterns[x.ref];
-  if (!p || p === 'loading') return `<div class="pat"><div class="note">Loading stops…</div></div>`;
-  if (p.err) return `<div class="pat"><div class="note">Couldn’t load stops: ${esc(p.err)}</div></div>`;
-  const pos = trainPosition(p), here = station();
+  const p = stopTimes(x), pos = trainPosition(p);
   let h = '<div class="pat">';
   p.forEach((s,i) => {
     const t = s.est || s.sched, late = s.est ? Math.round((s.est - s.sched)/60000) : 0;
-    const cls = [i <= pos ? 'past' : '', here && s.name.toLowerCase() === here.name.toLowerCase() ? 'here' : ''].join(' ');
-    h += `<div class="ps ${cls}"><i></i><span>${esc(s.name)}</span><span class="tm">${fmt(t)}${late >= 2 ? ` <b>+${late}</b>` : ''}</span></div>`;
-    if (i === pos && i < p.length - 1 && !x.cx) h += `<div class="ps trainpos"><i>🚆</i><span>Train is here${x.est ? '' : ' (by timetable)'}</span><span></span></div>`;
+    const mine = same(s.name, st.from) || same(s.name, st.to);
+    h += `<div class="ps ${i <= pos ? 'past' : ''} ${mine ? 'here' : ''}"><i></i><span>${esc(s.name)}${s.skip ? ' · not stopping' : ''}</span><span class="tm">${s.skip ? '—' : fmt(t)}${!s.skip && late >= 2 ? ` <b>+${late}</b>` : ''}</span></div>`;
+    if (i === pos && i < p.length - 1 && !x.cx) h += `<div class="ps trainpos"><i>🚆</i><span>Train is here${x.live ? '' : ' (by timetable)'}</span><span></span></div>`;
   });
   return h + '</div>';
 }
-async function toggleRun(ref){
-  if (openRun === ref){ openRun = null; render(); return; }
-  openRun = ref; await fetchPattern(ref);
-}
-async function fetchPattern(ref){
-  const x = data && data.list.find(y => y.ref === ref); if (!x) return;
-  if (!patterns[ref]) patterns[ref] = 'loading';
-  render();
-  try{ patterns[ref] = await loadPattern(x); }catch(e){ patterns[ref] = { err: e.message }; }
-  render();
-}
 function foot(){
-  $('foot').textContent = lastUpdated ? `Updated ${fmt(lastUpdated)}` + (st.mode === 'live' ? ' · auto-refreshes every 30s' : '') + (isDemo() ? ' · demo data' : ' · Data: PTV Timetable API') : '';
+  if (!lastUpdated){ $('foot').textContent = ''; return; }
+  const live = st.mode === 'live' && rtAt && !rtErr && RT;
+  $('foot').textContent = `Updated ${fmt(lastUpdated)}` + (st.mode === 'live' ? (live ? ' · live · refreshes every 30s' : ' · timetabled times') : '') + (isDemo() ? ' · demo data' : ' · Source: Transport Victoria');
+}
+function renderStatus(){
+  const rows = [];
+  if (TT && !TT.demo){
+    const f = n => { const s = String(n); return `${s.slice(6)}/${s.slice(4,6)}`; };
+    rows.push(['Timetable', `${TT.trips.length} trains · ${f(TT.from)} to ${f(TT.to)}`]);
+    rows.push(['Timetable updated', new Date(TT.generated).toLocaleString('en-AU',{timeZone:TZ, dateStyle:'medium', timeStyle:'short'})]);
+  } else rows.push(['Timetable', ttDemo ? 'Not set up yet (sample data)' : 'Sample data']);
+  rows.push(['Live data', isDemo() ? 'Sample data' : !DATA_SERVER ? 'Not connected' : rtErr ? 'Error: ' + rtErr : rtAt ? `Connected · ${RT ? RT.size : 0} trains reporting` : 'Connecting…']);
+  $('statusList').innerHTML = rows.map(r => `<div class="stat"><span>${esc(r[0])}</span><span>${esc(r[1])}</span></div>`).join('');
 }
 
 /* ---------- refresh ---------- */
-async function refresh(){
+async function refresh(full){
   if (loading) return;
   loading = true; $('refreshBtn').classList.add('spin'); render();
-  try{
-    if (!line) await loadLine();
-    data = await loadDeps(); lastErr = null; lastUpdated = new Date();
-    if (st.mode === 'live' && data.list.length){
-      const first = data.list.find(x => !x.cx) || data.list[0];
-      const refs = new Set([first.ref, openRun].filter(Boolean));
-      patterns = {};
-      await Promise.all([...refs].map(async r => { const x = data.list.find(y => y.ref === r); if (x) { try{ patterns[r] = await loadPattern(x); }catch(e){ patterns[r] = { err:e.message }; } } }));
-    }
-  }catch(e){ lastErr = e.message === 'Failed to fetch' ? 'Network error — check your connection and API key.' : e.message; }
+  if (full) TT = null;
+  await loadTimetable();
+  if (!TT.stations.some(n => same(n, st.from))) st.from = 'Tarneit';
+  if (!TT.stations.some(n => same(n, st.to)) || same(st.to, st.from)) st.to = same(st.from, 'Southern Cross') ? 'Tarneit' : 'Southern Cross';
+  if (st.mode === 'live') await loadRealtime();
+  data = compute(); lastUpdated = new Date();
   loading = false; $('refreshBtn').classList.remove('spin'); render();
 }
-function reset(){ data = null; pages = 0; openRun = null; patterns = {}; refresh(); }
+function reset(){ pages = 0; openRun = null; data = TT ? compute() : null; render(); if (st.mode === 'live' && !rtAt) refresh(); }
 
 setInterval(() => { if (st.mode === 'live' && document.visibilityState === 'visible') refresh(); }, LIVE_REFRESH);
-setInterval(() => { if (data && !loading && st.mode === 'live') render(); }, 15000);
+setInterval(() => { if (TT && !loading){ data = compute(); render(); } }, 15000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
 
 /* ---------- controls ---------- */
 document.querySelectorAll('#modeSeg button').forEach(b => b.onclick = () => { st.mode = b.dataset.m; save(); reset(); });
-$('stSel').onchange = e => { st.stationName = e.target.value; save(); reset(); };
-$('refreshBtn').onclick = () => refresh();
-function openSheet(){ $('scrim').classList.add('on'); $('setSheet').classList.add('on'); }
+$('fromSel').onchange = e => { st.from = e.target.value; if (same(st.from, st.to)) st.to = same(st.from,'Southern Cross') ? 'Tarneit' : 'Southern Cross'; save(); reset(); };
+$('toSel').onchange = e => { st.to = e.target.value; save(); reset(); };
+$('swapBtn').onclick = () => { [st.from, st.to] = [st.to, st.from]; save(); reset(); };
+$('refreshBtn').onclick = () => refresh(true);
+function openSheet(){ renderStatus(); $('demoToggle').checked = demoPref; $('scrim').classList.add('on'); $('setSheet').classList.add('on'); }
 function closeSheet(){ $('scrim').classList.remove('on'); $('setSheet').classList.remove('on'); }
 $('scrim').onclick = closeSheet; $('closeSet').onclick = closeSheet;
-$('settingsBtn').onclick = () => { $('devId').value = cfg.devId; $('apiKey').value = cfg.key; $('demoToggle').checked = !!cfg.demo; $('setMsg').textContent=''; openSheet(); };
-$('saveSet').onclick = async () => {
-  cfg = { devId: $('devId').value.trim(), key: $('apiKey').value.trim(), demo: $('demoToggle').checked };
-  store.set('cfg', cfg); line = null; store.set('line', null);
-  const msg = $('setMsg');
-  if (isDemo()){ msg.className = 'msg'; msg.textContent = 'Demo mode on.'; reset(); setTimeout(closeSheet, 700); return; }
-  msg.className = 'msg'; msg.textContent = 'Testing…';
-  try{ await api('/v3/route_types'); msg.className = 'msg ok'; msg.textContent = '✓ Connected to PTV. Live data is on.'; reset(); setTimeout(closeSheet, 900); }
-  catch(e){ msg.className = 'msg bad'; msg.textContent = '✗ ' + (e.message === 'Failed to fetch' ? 'Could not reach PTV.' : e.message) + ' Check your Developer ID and key.'; }
-};
+$('settingsBtn').onclick = openSheet;
+$('demoToggle').onchange = e => { demoPref = e.target.checked; store.set('demo', demoPref); RT = null; rtAt = null; refresh(true).then(renderStatus); };
 
 refresh();
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
