@@ -220,6 +220,7 @@ def build(files, today):
     stop_station = {sid: st for sid in stops if (st := station_of(sid)) is not None}
     platforms = {sid: (stops[sid].get('platform_code') or '').strip() for sid in stop_station
                  if (stops[sid].get('platform_code') or '').strip()}
+    log('Platform numbers found for', len(platforms), 'stop ids')
     log('Line stations found:', sorted({LINE[i] for i in stop_station.values()}, key=LINE.index))
 
     routes = {r['route_id']: r for r in rows(files, 'routes.txt')}
@@ -285,6 +286,7 @@ def build(files, today):
         'from': ymd(start), 'to': ymd(end),
         'stations': LINE,
         'stopIds': stop_station,           # GTFS stop_id (incl. platforms) -> station index
+        'platforms': platforms,            # GTFS stop_id -> platform number, where the data has one
         'services': services,              # list of active dates (yyyymmdd) per service
         'trips': out_trips,                # [trip_id, service, headsign, coach?, [[station, minutes, stop_sequence, platform]...]]
     }

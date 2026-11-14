@@ -222,6 +222,9 @@
   .toprow > div:first-child{min-width:0;max-width:52%;flex:none}
   .toprow .meta2{flex:1}
   .toprow .pill.coach{white-space:normal;line-height:1.2}
+  .snake .s-pl{font-size:9.5px;font-weight:700;fill:#ffd36b;text-anchor:middle}
+  .snake .s-pl.mine{fill:#fff}
+  .mplat{display:inline-block;padding:1px 5px;border-radius:6px;background:#1a1622;color:#ffd36b;font:700 10px -apple-system,sans-serif;box-shadow:0 1px 3px rgba(0,0,0,.4);white-space:nowrap}
 </style>
 </head>
 <body>
@@ -427,12 +430,13 @@ function applyRT(x){
   const u = RT.get(x.id);
   if (!u || (u.date && u.date !== x.day)) return;
   x.live = true; x.cx = u.cancelled;
-  const stops = x.t[4], est = new Array(stops.length).fill(null), skip = new Array(stops.length).fill(false);
+  const stops = x.t[4], est = new Array(stops.length).fill(null), skip = new Array(stops.length).fill(false), plat = new Array(stops.length).fill(null);
   let delay = null;
   stops.forEach((s, k) => {
     const upd = u.stops.find(v => (v.stop != null && TT.stopIds && TT.stopIds[v.stop] === s[0]) || (v.seq != null && v.seq === s[2]));
     const sched = melb(x.day, s[1]);
     if (upd){
+      if (upd.stop && TT.platforms && TT.platforms[upd.stop]) plat[k] = TT.platforms[upd.stop];
       if (upd.skip){ skip[k] = true; return; }
       const ev = upd.dep || upd.arr || {};
       if (ev.time){ est[k] = new Date(ev.time*1000); delay = (est[k] - sched)/1000; }
@@ -440,7 +444,8 @@ function applyRT(x){
       else if (delay != null) est[k] = new Date(sched.getTime() + delay*1000);
     } else if (delay != null) est[k] = new Date(sched.getTime() + delay*1000);
   });
-  x.stopsRT = { est, skip };
+  x.stopsRT = { est, skip, plat };
+  if (plat[x.i]) x.plat = plat[x.i];
   x.est = est[x.i]; x.arrEst = est[x.j]; x.skipFrom = skip[x.i]; x.skipTo = skip[x.j];
   if (x.skipFrom || x.skipTo) x.cx = true;
 }
@@ -615,7 +620,8 @@ function renderLive(){
 }
 function stopTimes(x){
   return x.t[4].map((s,k) => ({ name: TT.stations[s[0]], sched: melb(x.day, s[1]),
-    est: x.stopsRT ? x.stopsRT.est[k] : null, skip: x.stopsRT ? x.stopsRT.skip[k] : false }));
+    est: x.stopsRT ? x.stopsRT.est[k] : null, skip: x.stopsRT ? x.stopsRT.skip[k] : false,
+    plat: (x.stopsRT && x.stopsRT.plat[k]) || s[3] || '' }));
 }
 function trainPosition(p){ const now = Date.now(); let last = -1; p.forEach((s,i) => { if (!s.skip && (s.est || s.sched).getTime() <= now) last = i; }); return last; }
 function viewSwitch(inMeta){
@@ -664,6 +670,7 @@ function wherePill(x, inRow){
   if (i >= 0) g += `<path d="${run(0, 0, tk, tf)}" class="s-done"/>`;
   p.forEach((s, k) => {
     const P = pt(k), mine = k === x.i || k === x.j, past = k <= i && !s.skip;
+    if (s.plat && !s.skip) g += `<text x="${P.x}" y="${P.y - 11}" class="s-pl${mine ? ' mine' : ''}">P${esc(s.plat)}</text>`;
     g += `<circle cx="${P.x}" cy="${P.y}" r="${mine ? 6.5 : 4.5}" class="s-dot${mine ? ' mine' : ''}${past ? ' past' : ''}${s.skip ? ' skip' : ''}"/>`;
     const words = s.name.split(' '), two = s.name.length > 10 && words.length > 1;
     const l1 = two ? words.slice(0, Math.ceil(words.length / 2)).join(' ') : s.name, l2 = two ? words.slice(Math.ceil(words.length / 2)).join(' ') : '';
@@ -820,7 +827,8 @@ function drawTrip(c, x){
     const mine = k === x.i || k === x.j, ll = atKm(km[s[0]]).ll, passed = T && (up ? km[s[0]] >= T.km : km[s[0]] <= T.km);
     const m = L.circleMarker(ll, { radius: mine ? 7 : 5, color: mine ? '#ffffff' : '#3a3442', weight: mine ? 3 : 2, fillColor: mine ? '#a23bbf' : passed ? '#19b37a' : '#ffffff', fillOpacity: 1 }).addTo(lg);
     const t = p[k].skip ? 'not stopping' : fmt(p[k].est || p[k].sched);
-    m.bindTooltip(`${esc(p[k].name)} · ${t}`, { className: 'stn', direction: 'top', offset: [0, -6], permanent: mine });
+    m.bindTooltip(`${p[k].plat ? `Platform ${esc(p[k].plat)} · ` : ''}${esc(p[k].name)} · ${t}`, { className: 'stn', direction: 'top', offset: [0, -6], permanent: mine });
+    if (p[k].plat && !p[k].skip && !mine) L.marker(ll, { interactive: false, icon: L.divIcon({ className: '', iconSize: [30, 16], iconAnchor: [15, 24], html: `<div class="mplat">P${esc(p[k].plat)}</div>` }) }).addTo(lg);
   });
   if (T){
     const pt = atKm(T.km), brg = pt.brg + (up ? 180 : 0);
