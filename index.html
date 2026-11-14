@@ -173,7 +173,11 @@
   .snake .tw{fill:#bfe3f5} .snake .tl{fill:#ffe27a} .snake .tk{fill:#15131a}
   .snake .s-train{filter:drop-shadow(0 0 3px rgba(61,220,151,.75))}
   .snake .s-train.sched{filter:drop-shadow(0 0 2px rgba(255,255,255,.35))}
-  .snake .s-train.moving{animation:chug 1.2s ease-in-out infinite}
+  .snake .ph{fill:#3ddc97;opacity:.25;transform-origin:0 0;animation:ping 1.6s ease-out infinite}
+  .snake .pa{fill:#3ddc97;stroke:#0e0b14;stroke-width:1;stroke-linejoin:round}
+  .snake .pd{fill:#3ddc97;stroke:#fff;stroke-width:2}
+  .snake .s-train.sched .ph{fill:#cfc6da} .snake .s-train.sched .pa{fill:#cfc6da} .snake .s-train.sched .pd{fill:#cfc6da}
+  @keyframes ping{0%{transform:scale(.6);opacity:.45}100%{transform:scale(1.6);opacity:0}}
   @keyframes chug{50%{transform:translateX(1.5px)}}
   .where{margin-top:6px;font-size:13px;color:#e6d6ee}
 </style>
@@ -231,6 +235,7 @@ const store = {
 const HOME = 'West Tarneit', CITY = 'Southern Cross';
 const DEFAULT_TRIPS = [{ from: HOME, to: CITY }, { from: CITY, to: HOME }];
 let st = store.get('st2', { mode:'live', from: HOME, to: CITY });
+store.set('alarm', null);
 st.mode = 'live';   // the app is always live (no Live/Timetable buttons)
 let saved = store.get('saved', DEFAULT_TRIPS);
 // one-time switch: if this phone still has the old untouched defaults (Tarneit), move them to West Tarneit
@@ -418,12 +423,12 @@ function demoRealtime(){
 function compute(){
   if (!TT) return null;
   const live = st.mode === 'live';
-  const want = live ? 3 : 20 + pages*20;
+  const want = live ? 3 + pages*3 : 20 + pages*20;
   const now = Date.now();
-  const all = journeys(st.from, st.to, live ? 1 : 3 + pages*3);
+  const all = journeys(st.from, st.to, live ? 1 + Math.floor(pages / 4) : 3 + pages*3);
   all.forEach(x => { applyRT(x); x.when = (live && x.est) || x.sched; });
   const list = all.filter(x => x.when.getTime() > now - 60000).sort((a,b) => a.when - b.when);
-  return { list: list.slice(0, want), more: !live };
+  return { list: list.slice(0, want), more: live ? list.length > want : true };
 }
 
 /* ---------- render ---------- */
@@ -521,7 +526,7 @@ function renderLive(){
       <div class="in">${x.cx ? '—' : m <= 0 ? 'Now' : m < 60 ? `${m}<small>min</small>` : `${Math.floor(m/60)}h ${m%60}<small>&nbsp;</small>`}</div>
     </button>${openRuns.has(key(x)) && !x.cx ? `<div class="rtrk">${wherePill(x, true)}</div>` : ''}</div>`;
   });
-  if (data.more) h += `<button class="more" id="moreBtn">Show more</button>`;
+  if (data.more) h += `<button class="more" id="moreBtn">Show 3 more departures</button>`;
   return h + '</div>';
 }
 function stopTimes(x){
@@ -577,30 +582,11 @@ function wherePill(x, inRow){
     g += `<text x="${P.x}" y="${P.y + 20}" class="s-nm${mine ? ' mine' : ''}${past ? ' past' : ''}">${esc(l1)}${l2 ? `<tspan x="${P.x}" dy="11">${esc(l2)}</tspan>` : ''}<tspan x="${P.x}" dy="12" class="s-tm">${s.skip ? 'not stopping' : fmt(new Date(tm(s)))}</tspan></text>`;
   });
   const T = at(tk, tf), flip = Math.cos(T.h * Math.PI / 180) < -0.01;
-  const tr = flip ? `translate(${T.x.toFixed(1)} ${T.y.toFixed(1)}) rotate(${(T.h - 180).toFixed(1)}) scale(-1.25 1.25)` : `translate(${T.x.toFixed(1)} ${T.y.toFixed(1)}) rotate(${T.h.toFixed(1)}) scale(1.25)`;
+  const tr = flip ? `translate(${T.x.toFixed(1)} ${T.y.toFixed(1)}) rotate(${(T.h - 180).toFixed(1)}) scale(-1 1)` : `translate(${T.x.toFixed(1)} ${T.y.toFixed(1)}) rotate(${T.h.toFixed(1)})`;
   g += `<g transform="${tr}"><g class="s-train${x.live ? '' : ' sched'}${moving ? ' moving' : ''}">
-    <defs><linearGradient id="vlBody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9a4aa8"/><stop offset=".55" stop-color="#6e1f7c"/><stop offset="1" stop-color="#4b1257"/></linearGradient>
-      <linearGradient id="vlGlass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5d7c92"/><stop offset="1" stop-color="#16121e"/></linearGradient></defs>
-    <rect x="-29.2" y="-5.5" width="1.4" height="9.5" rx=".4" fill="#241b2b"/>
-    <rect x="-12" y="-8.7" width="7" height="1.6" rx=".5" fill="#3d1046"/><rect x="0" y="-8.4" width="5" height="1.3" rx=".5" fill="#3d1046"/>
-    <path d="M-28 -7.2 H12.5 C18.5 -7.2 23.8 -4.4 27.6 0.6 V5 H-28 Z" fill="url(#vlBody)"/>
-    <path d="M-28 -7.2 H12.5 C15 -7.2 17.3 -6.7 19.4 -5.9 H-28 Z" fill="#b77cc2" opacity=".55"/>
-    <rect x="-26" y="-4.7" width="37.6" height="3.6" rx=".6" fill="#1b1424"/>
-    <rect x="-25" y="-4.2" width="5.2" height="2.6" rx=".4" fill="url(#vlGlass)"/><rect x="-14.6" y="-4.2" width="5.2" height="2.6" rx=".4" fill="url(#vlGlass)"/>
-    <rect x="-8.6" y="-4.2" width="5.2" height="2.6" rx=".4" fill="url(#vlGlass)"/><rect x="-2.6" y="-4.2" width="5.2" height="2.6" rx=".4" fill="url(#vlGlass)"/>
-    <rect x="8.2" y="-4.2" width="3" height="2.6" rx=".4" fill="url(#vlGlass)"/>
-    <rect x="-19.4" y="-5" width="4.2" height="9.4" rx=".5" fill="none" stroke="#2c0a33" stroke-width=".5"/>
-    <rect x="3.4" y="-5" width="4.2" height="9.4" rx=".5" fill="none" stroke="#2c0a33" stroke-width=".5"/>
-    <path d="M14.6 -4.7 C19.4 -4.6 22.8 -2.9 25.4 -0.4 H14.6 Z" fill="url(#vlGlass)"/>
-    <path d="M15.6 -4.1 C18 -4 19.6 -3.5 21 -2.8" stroke="#cfe6f4" stroke-width=".5" fill="none" opacity=".8"/>
-    <rect x="-28" y="0.7" width="55.6" height=".5" fill="#ffffff" opacity=".85"/>
-    <rect x="-28" y="1.4" width="55.6" height="1.5" fill="#e0213a"/>
-    <path d="M24.6 2.9 h2.4 v1.6 h-3 z" fill="#ffd34d"/>
-    <circle cx="26.2" cy="1.9" r=".75" fill="#fff6c4"/>
-    <rect x="-28" y="5" width="55.6" height="1.3" fill="#231a29"/>
-    <rect x="-23.5" y="5.8" width="10" height="2.2" rx=".8" fill="#141017"/><rect x="12" y="5.8" width="10" height="2.2" rx=".8" fill="#141017"/>
-    <circle cx="-21" cy="7.6" r="1.4" fill="#3a3340"/><circle cx="-16" cy="7.6" r="1.4" fill="#3a3340"/>
-    <circle cx="14.5" cy="7.6" r="1.4" fill="#3a3340"/><circle cx="19.5" cy="7.6" r="1.4" fill="#3a3340"/>
+    <circle r="9" class="ph"/>
+    <path d="M6 -8 L21 0 L6 8 L9.5 0 Z" class="pa"/>
+    <circle r="4.6" class="pd"/>
   </g></g></svg>`;
   const txt = i < 0 ? `Not started yet · leaves ${esc(p[0].name)} at ${fmt(p[0].est || p[0].sched)}`
     : i >= n - 1 ? `Arrived at ${esc(p[n-1].name)}` : `Between ${esc(p[i].name)} and ${esc(p[next].name)}${x.live ? '' : ' (by timetable)'}`;
