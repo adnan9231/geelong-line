@@ -166,7 +166,7 @@
   .snake .s-dot.past{fill:#3ddc97;stroke:#3ddc97}
   .snake .s-dot.mine{fill:#c06ad8;stroke:#fff}
   .snake .s-dot.skip{opacity:.35;stroke-dasharray:2 2}
-  .snake .s-nm{font-size:10.5px;fill:#d8c4e2}
+  .snake .s-nm{font-size:10.5px;fill:#d8c4e2;text-anchor:middle}
   .snake .s-nm.past{fill:#9a8fa8} .snake .s-nm.mine{fill:#fff;font-weight:700}
   .snake .s-tm{font-size:9.5px;fill:#a99bb5;font-weight:400}
   .snake .tb{fill:#3b3943} .snake .tr{fill:#d5232f} .snake .tp{fill:#7d2a8c}
@@ -632,107 +632,51 @@ function wherePill(x, inRow){
   if (x.cx) return '';
   const p = stopTimes(x), n = p.length, i = trainPosition(p);
   const tm = s => (s.est || s.sched).getTime();
-  // snake layout drawn to scale: stations sit at their real track distance along a serpentine path
-  // (straight rows joined by U-turns; the U-turns count as distance too)
-  const geoKm = TT && TT.geo && TT.geo.stationKm;
-  const rawKm = p.map((s, k) => geoKm && geoKm[x.t[4][k][0]] != null ? geoKm[x.t[4][k][0]] : null);
-  const useKm = rawKm.every(v => v != null) && Math.abs(rawKm[n - 1] - rawKm[0]) > 0.5;
-  const kmAt = k => useKm ? Math.abs(rawKm[k] - rawKm[0]) : k * 6;
-  const D = kmAt(n - 1) || 1;
-  const W = 330, X0 = 54, X1 = 276, RH = 100, R = RH / 2, Y0 = 60, L = X1 - X0, ARC = Math.PI * R;
-  const ROWS = Math.max(1, Math.min(4, Math.round(D / 22)));
-  const PX = (ROWS * L + (ROWS - 1) * ARC) / D;        // pixels per km
-  const dOf = k => kmAt(k) * PX;
-  // point + heading at path distance d
-  function ptD(d){
-    d = Math.max(0, Math.min(d, ROWS * L + (ROWS - 1) * ARC));
-    let r = 0;
-    while (r < ROWS - 1 && d > L + ARC){ d -= L + ARC; r++; }
-    const rtl = r % 2 === 1, y = Y0 + r * RH;
-    if (d <= L || r === ROWS - 1){ const t = Math.min(d, L); return { x: rtl ? X1 - t : X0 + t, y, h: rtl ? 180 : 0, r, arc: false }; }
-    const a = (d - L) / R, cx = rtl ? X0 : X1, cy = y + R;   // a: radians travelled round the U-turn
-    const ang = rtl ? -Math.PI / 2 - a : -Math.PI / 2 + a;
-    return { x: cx + R * Math.cos(ang), y: cy + R * Math.sin(ang), h: (rtl ? ang - Math.PI / 2 : ang + Math.PI / 2) * 180 / Math.PI, r, arc: true, side: rtl ? -1 : 1 };
+  // snake layout: rows of 4 stations, left→right then right→left, joined by U-turns
+  const PER = 4, W = 320, X0 = 44, X1 = 276, RH = 80, Y0 = 26, R = RH / 2;
+  const dx = (X1 - X0) / (PER - 1);
+  const pt = k => { const r = Math.floor(k / PER), c = k % PER; return { x: r % 2 ? X1 - c * dx : X0 + c * dx, y: Y0 + r * RH, r }; };
+  // point + heading at fraction t along the segment from station k to k+1
+  function at(k, t){
+    const A = pt(k), B = pt(k + 1);
+    if (A.r === B.r) return { x: A.x + (B.x - A.x) * t, y: A.y, h: B.x >= A.x ? 0 : 180 };
+    const cx = A.x, cy = A.y + R, right = A.r % 2 === 0;
+    const ang = (right ? -90 + 180 * t : -90 - 180 * t) * Math.PI / 180;
+    return { x: cx + R * Math.cos(ang), y: cy + R * Math.sin(ang), h: (right ? ang * 180 / Math.PI + 90 : ang * 180 / Math.PI - 90) };
   }
-  // SVG path along the snake between two distances
-  function runD(a, b){
-    if (b <= a) return '';
-    const P = ptD(a); let d = `M${P.x.toFixed(1)} ${P.y.toFixed(1)}`;
-    for (let r = 0; r < ROWS; r++){
-      const s0 = r * (L + ARC), s1 = s0 + L, s2 = s1 + ARC;      // row r: straight [s0,s1], then U-turn [s1,s2]
-      if (b > s0 && a < s1){ const Q = ptD(Math.min(b, s1)); d += `L${Q.x.toFixed(1)} ${Q.y.toFixed(1)}`; }
-      if (r < ROWS - 1 && b > s1 && a < s2){
-        if (a > s1){ const S = ptD(a); d += `M${S.x.toFixed(1)} ${S.y.toFixed(1)}`; }
-        const Q = ptD(Math.min(b, s2)); d += `A${R} ${R} 0 0 ${r % 2 ? 0 : 1} ${Q.x.toFixed(1)} ${Q.y.toFixed(1)}`;
-      }
-    }
-    return d;
+  function seg(k, t0, t1){
+    const A = at(k, t0), B = at(k, t1), same = pt(k).r === pt(k + 1).r;
+    if (same) return `M${A.x.toFixed(1)} ${A.y}L${B.x.toFixed(1)} ${B.y}`;
+    const sweep = pt(k).r % 2 === 0 ? 1 : 0;
+    return `M${A.x.toFixed(1)} ${A.y.toFixed(1)}A${R} ${R} 0 0 ${sweep} ${B.x.toFixed(1)} ${B.y.toFixed(1)}`;
   }
-  // where the train is (as a distance along the track)
-  let td = 0, next = -1, moving = false;
-  if (i < 0) td = 0;
-  else if (i >= n - 1) td = dOf(n - 1);
+  const run = (k0, f0, k1, f1) => { let d = ''; for (let k = k0; k <= k1 && k < n - 1; k++) d += seg(k, k === k0 ? f0 : 0, k === k1 ? f1 : 1); return d; };
+  // where the train is
+  let tk = 0, tf = 0, next = -1, moving = false;
+  if (i < 0){ tk = 0; tf = 0; }
+  else if (i >= n - 1){ tk = n - 2; tf = 1; }
   else {
     next = i + 1; while (next < n - 1 && p[next].skip) next++;
     const t0 = tm(p[i]), t1 = tm(p[next]), now = Date.now();
     const frac = t1 > t0 ? Math.min(1, Math.max(0, (now - t0) / (t1 - t0))) : 0;
-    td = dOf(i) + (dOf(next) - dOf(i)) * frac;
+    const span = (next - i) * frac; tk = Math.min(n - 2, i + Math.floor(span)); tf = span - Math.floor(span);
+    if (i + Math.floor(span) >= n - 1){ tk = n - 2; tf = 1; }
     moving = frac > 0 && frac < 1;
   }
-  // labels: try spots around each station and keep the first one that doesn't overlap anything
-  const boxes = [], hit = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
-  const total = dOf(n - 1);
-  for (let d = 0; d <= total; d += 5){ const Q = ptD(d); boxes.push({ x0: Q.x - 3, x1: Q.x + 3, y0: Q.y - 3, y1: Q.y + 3 }); }
-  const pts = p.map((s, k) => ptD(dOf(k)));
-  pts.forEach((P, k) => { const r = k === x.i || k === x.j ? 7 : 5; boxes.push({ x0: P.x - r, x1: P.x + r, y0: P.y - r, y1: P.y + r }); });
-  { const Tp = ptD(td); boxes.push({ x0: Tp.x - 14, x1: Tp.x + 24, y0: Tp.y - 10, y1: Tp.y + 10 }); }   // keep labels off the train
-  const H = Y0 + (ROWS - 1) * RH + 52;
-  const order = p.map((s, k) => k).sort((a, b) => ((b === x.i || b === x.j) - (a === x.i || a === x.j)) || ((b === 0 || b === n - 1) - (a === 0 || a === n - 1)) || a - b);
-  const labels = [];
-  order.forEach(k => {
-    const s = p[k], P = pts[k], mine = k === x.i || k === x.j;
-    const words = s.name.split(' '), two = s.name.length > 10 && words.length > 1;
-    const lines = two ? [words.slice(0, Math.ceil(words.length / 2)).join(' '), words.slice(Math.ceil(words.length / 2)).join(' ')] : [s.name];
-    const time = s.skip ? 'not stopping' : fmt(new Date(tm(s)));
-    // a label must sit nearer its own dot than any other dot, so it can't be read as a neighbour's
-    const own = (cx, cy) => pts.every((Q, m) => m === k || Math.hypot(Q.x - cx, Q.y - cy) > Math.hypot(P.x - cx, P.y - cy) - 1);
-    function place(withTime){
-      const w = Math.max(...lines.map(l => l.length * (mine ? 6.4 : 5.9)), withTime ? time.length * 5.3 : 0) + 2, h = lines.length * 11 + (withTime ? 12 : 0);
-      const cands = [];
-      const add = (anchor, lx, top) => cands.push({ anchor, lx, top, x0: anchor === 'middle' ? lx - w / 2 : anchor === 'start' ? lx : lx - w });
-      if (P.arc){
-        add(P.side > 0 ? 'end' : 'start', P.x - P.side * 10, P.y - h / 2 + 2);       // inside the U-turn
-        add('middle', P.x - P.side * (w / 2 + 6), P.y + 10); add('middle', P.x - P.side * (w / 2 + 6), P.y - 10 - h);
-      }
-      add('middle', P.x, P.y + 12); add('middle', P.x, P.y - 12 - h);
-      for (const sh of [0.25, 0.45]) { add('middle', P.x + w * sh, P.y + 12); add('middle', P.x - w * sh, P.y + 12); add('middle', P.x + w * sh, P.y - 12 - h); add('middle', P.x - w * sh, P.y - 12 - h); }
-      for (const c of cands){
-        const b = { x0: c.x0, x1: c.x0 + w, y0: c.top, y1: c.top + h };
-        if (b.x0 < 1 || b.x1 > W - 1 || b.y0 < 1 || b.y1 > H - 1) continue;
-        if (!own((b.x0 + b.x1) / 2, P.y)) continue;
-        if (!boxes.some(o => hit(b, o))) return { c: { ...c, time: withTime ? time : '' }, b };
-      }
-      if (mine && withTime){ const c = cands.find(c => c.x0 >= 1 && c.x0 + w <= W - 1) || cands[0]; return { c: { ...c, time }, b: { x0: c.x0, x1: c.x0 + w, y0: c.top, y1: c.top + h } }; }
-      return null;
-    }
-    const best = place(true) || place(false);
-    if (!best) return;            // too tight to name this one; the dot still shows (all stops are in the list)
-    boxes.push(best.b);
-    labels[k] = { ...best.c, lines };
-  });
-  let g = `<svg class="snake" viewBox="0 0 ${W} ${H}" role="img" aria-label="Train position on the line, stations spaced by track distance">`;
-  g += `<path d="${runD(0, total)}" class="s-base"/>`;
-  if (x.j > x.i) g += `<path d="${runD(dOf(x.i), dOf(x.j))}" class="s-trip"/>`;
-  if (i >= 0) g += `<path d="${runD(0, td)}" class="s-done"/>`;
+  const rows = Math.ceil(n / PER), H = Y0 + (rows - 1) * RH + 46;
+  let g = `<svg class="snake" viewBox="0 0 ${W} ${H}" role="img" aria-label="Train position on the line">`;
+  g += `<path d="${run(0, 0, n - 2, 1)}" class="s-base"/>`;
+  if (x.j > x.i) g += `<path d="${run(x.i, 0, x.j - 1, 1)}" class="s-trip"/>`;
+  if (i >= 0) g += `<path d="${run(0, 0, tk, tf)}" class="s-done"/>`;
   p.forEach((s, k) => {
-    const P = pts[k], mine = k === x.i || k === x.j, past = k <= i && !s.skip, lb = labels[k];
-    if (s.plat && !s.skip) g += `<text x="${P.x.toFixed(1)}" y="${(P.y - 11).toFixed(1)}" class="s-pl${mine ? ' mine' : ''}">P${esc(s.plat)}</text>`;
-    g += `<circle cx="${P.x.toFixed(1)}" cy="${P.y.toFixed(1)}" r="${mine ? 6.5 : 4.5}" class="s-dot${mine ? ' mine' : ''}${past ? ' past' : ''}${s.skip ? ' skip' : ''}"/>`;
-    if (!lb) return;
-    const lx = lb.lx.toFixed(1), y1 = (lb.top + 9).toFixed(1);
-    g += `<text x="${lx}" y="${y1}" text-anchor="${lb.anchor}" class="s-nm${mine ? ' mine' : ''}${past ? ' past' : ''}">${esc(lb.lines[0])}${lb.lines[1] ? `<tspan x="${lx}" dy="11">${esc(lb.lines[1])}</tspan>` : ''}${lb.time ? `<tspan x="${lx}" dy="12" class="s-tm">${lb.time}</tspan>` : ''}</text>`;
+    const P = pt(k), mine = k === x.i || k === x.j, past = k <= i && !s.skip;
+    if (s.plat && !s.skip) g += `<text x="${P.x}" y="${P.y - 11}" class="s-pl${mine ? ' mine' : ''}">P${esc(s.plat)}</text>`;
+    g += `<circle cx="${P.x}" cy="${P.y}" r="${mine ? 6.5 : 4.5}" class="s-dot${mine ? ' mine' : ''}${past ? ' past' : ''}${s.skip ? ' skip' : ''}"/>`;
+    const words = s.name.split(' '), two = s.name.length > 10 && words.length > 1;
+    const l1 = two ? words.slice(0, Math.ceil(words.length / 2)).join(' ') : s.name, l2 = two ? words.slice(Math.ceil(words.length / 2)).join(' ') : '';
+    g += `<text x="${P.x}" y="${P.y + 20}" class="s-nm${mine ? ' mine' : ''}${past ? ' past' : ''}">${esc(l1)}${l2 ? `<tspan x="${P.x}" dy="11">${esc(l2)}</tspan>` : ''}<tspan x="${P.x}" dy="12" class="s-tm">${s.skip ? 'not stopping' : fmt(new Date(tm(s)))}</tspan></text>`;
   });
-  const T = ptD(td), flip = Math.cos(T.h * Math.PI / 180) < -0.01;
+  const T = at(tk, tf), flip = Math.cos(T.h * Math.PI / 180) < -0.01;
   const tr = flip ? `translate(${T.x.toFixed(1)} ${T.y.toFixed(1)}) rotate(${(T.h - 180).toFixed(1)}) scale(-1 1)` : `translate(${T.x.toFixed(1)} ${T.y.toFixed(1)}) rotate(${T.h.toFixed(1)})`;
   g += `<g transform="${tr}"><g class="s-train${x.live ? '' : ' sched'}${moving ? ' moving' : ''}">
     <circle r="9" class="ph"/>
