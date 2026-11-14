@@ -206,6 +206,22 @@
   .row.gone .t,.row.gone .a{color:#b9b0c6} .row.gone .in{color:var(--muted)}
   .vt.inmeta{justify-content:flex-start;margin:6px 0 0}
   .vt.inmeta button{padding:6px 14px;font-size:13px}
+  #tripSheet .trip{margin:0 0 6px;background:var(--card)}
+  .chips{margin-top:0}
+  /* saved trips as a vertical list */
+  .chips{flex-direction:column;overflow:visible;margin:0;padding:0;gap:5px}
+  .chip{width:100%;justify-content:space-between;padding:7px 12px;font-size:14px;border-radius:10px}
+  .chip.add{justify-content:center;padding:5px 12px;font-size:13px;background:transparent;border:1px dashed rgba(192,106,216,.5);color:var(--accent);font-weight:600}
+  .chip .x{font-size:15px}
+  .pair{display:flex;gap:5px;width:100%}
+  .pd{flex:1;min-width:0;text-align:left;padding:6px 10px;border-radius:10px;background:var(--card);color:#d8d2e2;font-size:14px;font-weight:600;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pd small{display:block;font-size:11px;font-weight:500;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+  .pd.on{background:var(--accent2);color:#fff} .pd.on small{color:#ecd3f2}
+  .px{flex:none;width:34px;border-radius:10px;background:var(--card);color:var(--muted);font-size:16px}
+  .px.star{color:var(--accent)}
+  .toprow > div:first-child{min-width:0;max-width:52%;flex:none}
+  .toprow .meta2{flex:1}
+  .toprow .pill.coach{white-space:normal;line-height:1.2}
 </style>
 </head>
 <body>
@@ -219,7 +235,16 @@
 </div>
 
 
-<div class="trip">
+<div class="chips" id="chips"></div>
+<div id="alerts"></div>
+<div id="main"></div>
+<div class="foot" id="foot"></div>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="tripSheet">
+  <div class="grab"></div>
+  <h3>Add a trip</h3>
+  <div class="trip">
   <div class="stops">
     <div class="sp"><small>From</small><div class="nm" id="fromName">…</div><select id="fromSel" aria-label="Departure station"></select></div>
     <hr>
@@ -227,13 +252,9 @@
   </div>
   <button class="swap" id="swapBtn" aria-label="Swap stations"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M7 4 3 8M7 4l4 4"/><path d="M17 20V4M17 20l-4-4M17 20l4-4"/></svg></button>
 </div>
-
-<div class="chips" id="chips"></div>
-<div id="alerts"></div>
-<div id="main"></div>
-<div class="foot" id="foot"></div>
-
-<div class="scrim" id="scrim"></div>
+  <button class="btn" id="saveTripBtn">Save trip</button>
+  <button class="btn ghost" id="closeTrip">Close</button>
+</div>
 <div class="sheet" id="setSheet">
   <div class="grab"></div>
   <h3>Data status</h3>
@@ -280,7 +301,7 @@ let RT = null, rtAt = null, rtErr = null;           // realtime: Map trip_id -> 
 let data = null, loading = false, pages = 0, lastUpdated = null;
 const openRuns = new Set();
 const mapKeys = new Set();
-let viewPref = store.get('view', 'map');   // 'map' or 'line', remembered on this phone
+let viewPref = store.get('view', 'line');   // 'map' or 'line', remembered on this phone
 let earlier = 0;                // recent departures shown = earlier * 3
 let fsKey = null;               // map shown full screen     // trains shown on the real map instead of the line diagram   // trains whose track / stop list is open (several at once)
 const save = () => store.set('st2', st);
@@ -482,16 +503,23 @@ function renderControls(){
     const opts = sel => TT.stations.map(n => `<option ${same(n, sel) ? 'selected' : ''}>${esc(n)}</option>`).join('');
     $('fromSel').innerHTML = opts(st.from); $('toSel').innerHTML = opts(st.to);
   }
-  const cur = tripKey(st);
-  let h = saved.map((t,i) => `<button class="chip${tripKey(t) === cur ? ' on' : ''}" data-i="${i}">${esc(t.from)} → ${esc(t.to)}${tripKey(t) === cur ? '<span class="x" data-del="'+i+'" aria-label="Remove">×</span>' : ''}</button>`).join('');
-  if (!saved.some(t => tripKey(t) === cur)) h += `<button class="chip add" id="saveTrip">☆ Save this trip</button>`;
+  // saved trips as station pairs: one row per pair, with both directions
+  const cur = tripKey(st), pk = (x, y) => [x.toLowerCase(), y.toLowerCase()].sort().join('|');
+  const pairs = [];
+  saved.forEach(t => { const k = pk(t.from, t.to); if (!pairs.some(p => p.k === k)) pairs.push({ k, a: t.from, b: t.to, saved: true }); });
+  if (!pairs.some(p => p.k === pk(st.from, st.to)) && !same(st.from, st.to)) pairs.push({ k: pk(st.from, st.to), a: st.from, b: st.to, saved: false });
+  const dirBtn = (f, t) => `<button class="pd${tripKey({ from: f, to: t }) === cur ? ' on' : ''}" data-f="${esc(f)}" data-t="${esc(t)}"><small>from ${esc(f)}</small>to ${esc(t)}</button>`;
+  let h = pairs.map(p => `<div class="pair">${dirBtn(p.a, p.b)}${dirBtn(p.b, p.a)}${p.saved
+      ? `<button class="px" data-delpair="${esc(p.k)}" aria-label="Remove trip">×</button>`
+      : `<button class="px star" data-savepair="${esc(p.k)}" aria-label="Save trip">☆</button>`}</div>`).join('');
+  h += `<button class="chip add" id="addTrip">＋ Add trip</button>`;
   $('chips').innerHTML = h;
-  $('chips').querySelectorAll('[data-i]').forEach(b => b.onclick = e => {
-    const del = e.target.closest('[data-del]');
-    if (del){ saved.splice(+del.dataset.del, 1); store.set('saved', saved); renderControls(); return; }
-    const t = saved[+b.dataset.i]; st.from = t.from; st.to = t.to; save(); reset();
+  $('chips').querySelectorAll('[data-f]').forEach(b => b.onclick = () => { st.from = b.dataset.f; st.to = b.dataset.t; save(); reset(); });
+  $('chips').querySelectorAll('[data-delpair]').forEach(b => b.onclick = () => {
+    saved = saved.filter(t => pk(t.from, t.to) !== b.dataset.delpair); store.set('saved', saved); renderControls();
   });
-  const s = $('saveTrip'); if (s) s.onclick = () => { saved.push({ from: st.from, to: st.to }); store.set('saved', saved); renderControls(); };
+  $('chips').querySelectorAll('[data-savepair]').forEach(b => b.onclick = () => { saved.push({ from: st.from, to: st.to }); store.set('saved', saved); renderControls(); });
+  $('addTrip').onclick = () => openTrip();
 }
 function render(){
   renderControls();
@@ -833,7 +861,13 @@ $('toSel').onchange = e => { st.to = e.target.value; save(); reset(); };
 $('swapBtn').onclick = () => { [st.from, st.to] = [st.to, st.from]; save(); reset(); };
 $('refreshBtn').onclick = () => refresh(true);
 function openSheet(){ renderStatus(); $('demoToggle').checked = demoPref; $('scrim').classList.add('on'); $('setSheet').classList.add('on'); }
-function closeSheet(){ $('scrim').classList.remove('on'); $('setSheet').classList.remove('on'); }
+function closeSheet(){ $('scrim').classList.remove('on'); $('setSheet').classList.remove('on'); $('tripSheet').classList.remove('on'); }
+function openTrip(){ renderControls(); $('scrim').classList.add('on'); $('tripSheet').classList.add('on'); }
+$('closeTrip').onclick = closeSheet;
+$('saveTripBtn').onclick = () => {
+  if (!same(st.from, st.to) && !saved.some(t => tripKey(t) === tripKey(st))){ saved.push({ from: st.from, to: st.to }); store.set('saved', saved); }
+  closeSheet(); renderControls();
+};
 $('scrim').onclick = closeSheet; $('closeSet').onclick = closeSheet;
 $('settingsBtn').onclick = openSheet;
 $('demoToggle').onchange = e => { demoPref = e.target.checked; store.set('demo', demoPref); RT = null; rtAt = null; refresh(true).then(renderStatus); };
