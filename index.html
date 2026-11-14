@@ -546,7 +546,7 @@ function renderLive(){
     const m = mins(x.when), late = x.est ? Math.round((x.est - x.sched)/60000) : 0;
     h += `<div class="row${x.cx ? ' cx':''}"><button data-run="${esc(key(x))}">
       <div class="t">${fmt(x.when)}${late >= 2 ? `<s>${fmt(x.sched)}</s>` : ''}</div>
-      <div><div class="a">Arr ${fmt(arrOf(x,true))} · ${durOf(x,true)} min</div><div class="b">${pill(x)}${coachTag(x)}${x.plat ? `<span>Plat ${esc(x.plat)}</span>` : ''}${x.cx ? '' : `<span class="tg">${openRuns.has(key(x)) ? 'Hide track ▴' : 'Show track ▾'}</span>`}</div></div>
+      <div><div class="a">Arr ${fmt(arrOf(x,true))} · ${durOf(x,true)} min</div><div class="b">${pill(x)}${coachTag(x)}${x.plat ? `<span>Plat ${esc(x.plat)}</span>` : ''}${x.cx ? '' : `<span class="tg">${openRuns.has(key(x)) ? 'Hide map ▴' : 'Show map ▾'}</span>`}</div></div>
       <div class="in">${x.cx ? '—' : m <= 0 ? 'Now' : m < 60 ? `${m}<small>min</small>` : `${Math.floor(m/60)}h ${m%60}<small>&nbsp;</small>`}</div>
     </button>${openRuns.has(key(x)) && !x.cx ? `<div class="rtrk">${wherePill(x, true)}</div>` : ''}</div>`;
   });
@@ -614,10 +614,10 @@ function wherePill(x, inRow){
   </g></g></svg>`;
   const txt = i < 0 ? `Not started yet · leaves ${esc(p[0].name)} at ${fmt(p[0].est || p[0].sched)}`
     : i >= n - 1 ? `Arrived at ${esc(p[n-1].name)}` : `Between ${esc(p[i].name)} and ${esc(p[next].name)}${x.live ? '' : ' (by timetable)'}`;
-  const k = key(x), onMap = mapKeys.has(k);
+  const k = key(x), onMap = true;   // map view only
   const geo = TT && TT.geo, km = geo && geo.stationKm;
   const dist = km && km[x.t[4][x.i][0]] != null && km[x.t[4][x.j][0]] != null ? Math.abs(km[x.t[4][x.j][0]] - km[x.t[4][x.i][0]]) : null;
-  const sw = `<div class="vt"><button data-view="line" data-k="${esc(k)}" class="${onMap ? '' : 'on'}">Line</button><button data-view="map" data-k="${esc(k)}" class="${onMap ? 'on' : ''}">Map</button></div>`;
+  const sw = '';
   return sw + (onMap ? `<div class="lmap" data-k="${esc(k)}"></div>` : g)
     + `<div class="where">${txt}${dist != null ? ` · ${dist.toFixed(1)} km trip` : ''}${inRow || openRuns.has(k) ? '' : ' · tap for all stops'}</div>`;
 }
