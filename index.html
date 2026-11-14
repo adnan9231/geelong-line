@@ -187,12 +187,11 @@
   .lmap{margin-top:12px;border-radius:14px;overflow:hidden;min-height:280px;background:#1a1622}
   .lmap .lmapnode{height:280px}
   .lmap .msg{padding:24px 16px;color:var(--muted);font-size:13px;text-align:center}
-  .trainpin{width:30px;height:30px;display:grid;place-items:center}
-  .trainpin i{position:absolute;width:30px;height:30px;border-radius:50%;background:rgba(61,220,151,.3);animation:ping2 1.6s ease-out infinite}
-  .trainpin b{position:relative;width:16px;height:16px;border-radius:50%;background:#3ddc97;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5)}
-  .trainpin svg{position:absolute;width:30px;height:30px}
-  .trainpin.sched b{background:#9a93a8} .trainpin.sched i{background:rgba(154,147,168,.3)}
-  @keyframes ping2{0%{transform:scale(.5);opacity:.6}100%{transform:scale(1.4);opacity:0}}
+  .trainpin{position:relative;width:56px;height:56px;display:grid;place-items:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,.55))}
+  .trainpin i{position:absolute;left:8px;top:8px;width:40px;height:40px;border-radius:50%;background:rgba(18,183,106,.35);border:2px solid rgba(18,183,106,.8);animation:ping2 1.6s ease-out infinite}
+  .trainpin.sched i{background:rgba(143,26,149,.3);border-color:rgba(143,26,149,.8)}
+  .trainpin svg{position:absolute;inset:0;width:56px;height:56px}
+  @keyframes ping2{0%{transform:scale(.45);opacity:.9}100%{transform:scale(1.35);opacity:0}}
   .leaflet-container{font:12px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
   .leaflet-tooltip.stn{background:#1a1622;color:#f4f1f8;border:0;box-shadow:0 1px 4px rgba(0,0,0,.4);font-weight:600;padding:3px 7px}
   .leaflet-tooltip.stn:before{display:none}
@@ -205,6 +204,8 @@
   .earlier{display:block;width:100%;margin:2px 0 4px;padding:10px;border-radius:12px;color:var(--accent);font-weight:600;font-size:14px;background:transparent}
   .more.top{border-top:0;border-bottom:1px solid var(--line)}
   .row.gone .t,.row.gone .a{color:#b9b0c6} .row.gone .in{color:var(--muted)}
+  .vt.inmeta{justify-content:flex-start;margin:6px 0 0}
+  .vt.inmeta button{padding:6px 14px;font-size:13px}
 </style>
 </head>
 <body>
@@ -279,6 +280,7 @@ let RT = null, rtAt = null, rtErr = null;           // realtime: Map trip_id -> 
 let data = null, loading = false, pages = 0, lastUpdated = null;
 const openRuns = new Set();
 const mapKeys = new Set();
+let viewPref = store.get('view', 'map');   // 'map' or 'line', remembered on this phone
 let earlier = 0;                // recent departures shown = earlier * 3
 let fsKey = null;               // map shown full screen     // trains shown on the real map instead of the line diagram   // trains whose track / stop list is open (several at once)
 const save = () => store.set('st2', st);
@@ -512,8 +514,8 @@ function render(){
   m.querySelectorAll('[data-run]').forEach(b => b.onclick = () => { const k = b.dataset.run; openRuns.has(k) ? openRuns.delete(k) : openRuns.add(k); render(); });
   m.querySelectorAll('[data-view]').forEach(b => b.onclick = e => {
     e.stopPropagation();
-    const k = b.dataset.k;
-    if (b.dataset.view === 'map') mapKeys.add(k); else mapKeys.delete(k);
+    viewPref = b.dataset.view; store.set('view', viewPref);
+    if (viewPref === 'line'){ fsKey = null; document.body.classList.remove('fsopen'); }
     render();
   });
   m.querySelectorAll('[data-fs]').forEach(b => b.onclick = e => {
@@ -547,7 +549,7 @@ function rowHTML(x){
   const ago = -m < 60 ? `${-m}<small>min ago</small>` : `${Math.floor(-m/60)}h ${-m%60}<small>ago</small>`;
   return `<div class="row${x.cx ? ' cx':''}${past ? ' gone' : ''}"><button data-run="${esc(key(x))}">
       <div class="t">${fmt(x.when)}${late >= 2 ? `<s>${fmt(x.sched)}</s>` : ''}</div>
-      <div><div class="a">Arr ${fmt(arrOf(x,true))} · ${durOf(x,true)} min</div><div class="b">${pill(x)}${coachTag(x)}${x.plat ? `<span>Plat ${esc(x.plat)}</span>` : ''}${x.cx ? '' : `<span class="tg">${openRuns.has(key(x)) ? 'Hide map ▴' : 'Show map ▾'}</span>`}</div></div>
+      <div><div class="a">Arr ${fmt(arrOf(x,true))} · ${durOf(x,true)} min</div><div class="b">${pill(x)}${coachTag(x)}${x.plat ? `<span>Plat ${esc(x.plat)}</span>` : ''}${x.cx ? '' : `<span class="tg">${openRuns.has(key(x)) ? (viewPref === 'map' ? 'Hide map ▴' : 'Hide track ▴') : (viewPref === 'map' ? 'Show map ▾' : 'Show track ▾')}</span>`}</div></div>
       <div class="in">${x.cx ? '—' : past ? ago : m === 0 ? 'Now' : m < 60 ? `${m}<small>min</small>` : `${Math.floor(m/60)}h ${m%60}<small>&nbsp;</small>`}</div>
     </button>${openRuns.has(key(x)) && !x.cx ? `<div class="rtrk">${wherePill(x, true)}</div>` : ''}</div>`;
 }
@@ -571,8 +573,7 @@ function renderLive(){
         <span>Departs <b>${fmt(first.when)}</b></span>${first.est && Math.abs(first.est-first.sched) >= 120000 ? `<span style="opacity:.6;font-size:12px">was <s>${fmt(first.sched)}</s></span>` : ''}
         <span>Arrives <b>${fmt(arrOf(first,true))}</b></span>
         <span>${durOf(first,true)} min</span>
-        <span>to ${esc(first.head)}</span>
-        ${first.plat ? `<span>Platform <b>${esc(first.plat)}</b></span>` : ''}
+        ${first.cx ? '' : viewSwitch(true)}
       </div>
     </div>
     ${wherePill(first)}
@@ -589,6 +590,10 @@ function stopTimes(x){
     est: x.stopsRT ? x.stopsRT.est[k] : null, skip: x.stopsRT ? x.stopsRT.skip[k] : false }));
 }
 function trainPosition(p){ const now = Date.now(); let last = -1; p.forEach((s,i) => { if (!s.skip && (s.est || s.sched).getTime() <= now) last = i; }); return last; }
+function viewSwitch(inMeta){
+  const onMap = viewPref === 'map';
+  return `<div class="vt${inMeta ? ' inmeta' : ''}"><button data-view="line" class="${onMap ? '' : 'on'}">Line</button><button data-view="map" class="${onMap ? 'on' : ''}">Map</button></div>`;
+}
 function wherePill(x, inRow){
   if (x.cx) return '';
   const p = stopTimes(x), n = p.length, i = trainPosition(p);
@@ -645,10 +650,10 @@ function wherePill(x, inRow){
   </g></g></svg>`;
   const txt = i < 0 ? `Not started yet · leaves ${esc(p[0].name)} at ${fmt(p[0].est || p[0].sched)}`
     : i >= n - 1 ? `Arrived at ${esc(p[n-1].name)}` : `Between ${esc(p[i].name)} and ${esc(p[next].name)}${x.live ? '' : ' (by timetable)'}`;
-  const k = key(x), onMap = true;   // map view only
+  const k = key(x), onMap = viewPref === 'map';
   const geo = TT && TT.geo, km = geo && geo.stationKm;
   const dist = km && km[x.t[4][x.i][0]] != null && km[x.t[4][x.j][0]] != null ? Math.abs(km[x.t[4][x.j][0]] - km[x.t[4][x.i][0]]) : null;
-  const sw = '';
+  const sw = inRow ? viewSwitch(false) : '';   // the next train has its switch beside the countdown
   const fs = fsKey === k;
   return sw + (onMap ? `<div class="lmap${fs ? ' fs' : ''}" data-k="${esc(k)}"><button class="fsbtn" data-fs="${esc(k)}" aria-label="${fs ? 'Close full screen' : 'Full screen map'}">${fs ? '✕' : '⤢'}</button></div>` : g)
     + `<div class="where">${txt}${dist != null ? ` · ${dist.toFixed(1)} km trip` : ''}${inRow || openRuns.has(k) ? '' : ' · tap for all stops'}</div>`;
@@ -791,8 +796,11 @@ function drawTrip(c, x){
   });
   if (T){
     const pt = atKm(T.km), brg = pt.brg + (up ? 180 : 0);
-    const icon = L.divIcon({ className: '', iconSize: [30, 30], iconAnchor: [15, 15],
-      html: `<div class="trainpin${x.live ? '' : ' sched'}"><i></i><svg viewBox="-15 -15 30 30" style="transform:rotate(${brg.toFixed(0)}deg)"><path d="M0 -14 L6 -6 L0 -8 L-6 -6 Z" fill="${x.live ? '#3ddc97' : '#9a93a8'}" stroke="#0e0b14" stroke-width="1"/></svg><b></b></div>` });
+    const col = x.live ? '#12b76a' : '#8f1a95';
+    const icon = L.divIcon({ className: '', iconSize: [56, 56], iconAnchor: [28, 28],
+      html: `<div class="trainpin${x.live ? '' : ' sched'}"><i></i><svg viewBox="-28 -28 56 56" style="transform:rotate(${brg.toFixed(0)}deg)">
+        <path d="M0 -19 L13 15 L0 8 L-13 15 Z" fill="${col}" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round"/>
+      </svg></div>` });
     L.marker(pt.ll, { icon, interactive: false, zIndexOffset: 1000 }).addTo(lg);
   }
   if (!c.fitted){ c.map.invalidateSize(); c.map.fitBounds(L.polyline(kmSlice(K(x.i), K(x.j))).getBounds().extend(T ? atKm(T.km).ll : atKm(K(x.i)).ll), { padding: [30, 30] }); c.fitted = true; }
