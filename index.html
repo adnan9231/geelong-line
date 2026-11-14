@@ -73,8 +73,6 @@
   .plat{position:absolute;right:18px;top:18px;text-align:center;background:rgba(255,255,255,.1);border-radius:16px;padding:8px 12px;min-width:64px}
   .plat small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#d8c4e2}
   .plat b{font-size:28px;font-weight:750}
-  .where{margin-top:12px;font-size:14px;color:#e6d6ee;display:flex;align-items:center;gap:8px}
-  .where::before{content:"🚆"}
 
   .pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;border-radius:999px;padding:3px 9px;white-space:nowrap}
   .pill.live{background:rgba(61,220,151,.14);color:var(--ok)}
@@ -147,6 +145,25 @@
   .stat{display:flex;justify-content:space-between;gap:12px;padding:11px 2px;border-top:1px solid var(--line);font-size:15px}
   .stat span:last-child{color:var(--muted);text-align:right}
   .pill.coach{background:rgba(120,170,255,.14);color:#9cc0ff}
+  /* line map */
+  .trk{position:relative;height:74px;margin:16px 6px 0}
+  .trk .ln{position:absolute;left:0;right:0;top:14px;height:4px;border-radius:2px;background:rgba(255,255,255,.14)}
+  .trk .seg{position:absolute;top:13px;height:6px;border-radius:3px;background:rgba(192,106,216,.55)}
+  .trk .done{position:absolute;left:0;top:14px;height:4px;border-radius:2px;background:var(--ok);opacity:.85}
+  .trk .dt{position:absolute;top:10px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:#2a2134;border:2px solid rgba(255,255,255,.45)}
+  .trk .dt.past{background:var(--ok);border-color:var(--ok)}
+  .trk .dt.mine{width:16px;height:16px;margin-left:-8px;top:8px;background:var(--accent);border-color:#fff}
+  .trk .dt.skip{opacity:.35;border-style:dashed}
+  .trk.two{height:104px}
+  .trk .nm{position:absolute;top:30px;font-size:11px;line-height:1.25;color:#d8c4e2;white-space:nowrap;transform:translateX(-50%);text-align:center}
+  .trk .nm.l{transform:none;text-align:left} .trk .nm.r{transform:translateX(-100%);text-align:right}
+  .trk .nm b{font-weight:700;color:#fff} .trk .nm small{display:block;color:#a99bb5;font-size:11px}
+  .trk .trn{position:absolute;top:2px;width:30px;height:20px;margin-left:-15px;border-radius:7px 12px 12px 7px;background:var(--ok);color:#06281b;
+    display:grid;place-items:center;font-size:11px;font-weight:800;box-shadow:0 0 0 4px rgba(61,220,151,.22);transition:left 1s ease}
+  .trk .trn.sched{background:#cfc6da;box-shadow:0 0 0 4px rgba(255,255,255,.12);color:#2a2134}
+  .trk .trn.moving{animation:chug 1.2s ease-in-out infinite}
+  @keyframes chug{50%{transform:translateX(3px)}}
+  .where{margin-top:6px;font-size:13px;color:#e6d6ee}
 </style>
 </head>
 <body>
@@ -433,6 +450,7 @@ function render(){
   if (!data){ m.innerHTML = loading ? '<div class="skel"></div>' : ''; foot(); return; }
   if (!data.list.length){ m.innerHTML = `<div class="list" style="margin-top:16px"><div class="empty">No upcoming trains from ${esc(st.from)} to ${esc(st.to)}.</div></div>`; foot(); return; }
   m.innerHTML = st.mode === 'tt' ? renderTT() : renderLive();
+  layoutTracks();
   const mb = $('moreBtn'); if (mb) mb.onclick = () => { pages++; data = compute(); render(); };
   m.querySelectorAll('[data-run]').forEach(b => b.onclick = () => { openRun = openRun === b.dataset.run ? null : b.dataset.run; render(); });
   foot();
@@ -485,10 +503,53 @@ function stopTimes(x){
 function trainPosition(p){ const now = Date.now(); let last = -1; p.forEach((s,i) => { if (!s.skip && (s.est || s.sched).getTime() <= now) last = i; }); return last; }
 function wherePill(x){
   if (x.cx) return '';
-  const p = stopTimes(x), i = trainPosition(p);
+  const p = stopTimes(x), n = p.length, i = trainPosition(p);
+  const pos = k => n > 1 ? k / (n - 1) * 100 : 0;
+  const tm = s => (s.est || s.sched).getTime();
+  // train position along the line (0-100%), interpolated between the last and next stations by time
+  let f, moving = false, next = -1;
+  if (i < 0) f = 0;
+  else if (i >= n - 1) f = 100;
+  else {
+    next = i + 1; while (next < n - 1 && p[next].skip) next++;
+    const t0 = tm(p[i]), t1 = tm(p[next]), now = Date.now();
+    const frac = t1 > t0 ? Math.min(1, Math.max(0, (now - t0) / (t1 - t0))) : 0;
+    f = pos(i) + frac * (pos(next) - pos(i)); moving = frac > 0 && frac < 1;
+  }
+  // which station names fit: your stations first, then the next stop, then the two ends
+  const prio = [x.i, x.j, next, 0, n - 1].filter((k, q, a) => k >= 0 && a.indexOf(k) === q);
+  let h = `<div class="trk" aria-label="Train position on the line">
+    <div class="ln"></div>
+    <div class="seg" style="left:${pos(x.i)}%;width:${pos(x.j) - pos(x.i)}%"></div>
+    <div class="done" style="width:${f}%"></div>`;
+  p.forEach((s, k) => {
+    const cls = [k === x.i || k === x.j ? 'mine' : '', k <= i && !s.skip ? 'past' : '', s.skip ? 'skip' : ''].join(' ');
+    h += `<i class="dt ${cls}" style="left:${pos(k)}%" title="${esc(s.name)}"></i>`;
+  });
+  prio.forEach((k, q) => {
+    const s = p[k], side = pos(k) < 10 ? ' l' : pos(k) > 90 ? ' r' : '';
+    const name = k === x.i || k === x.j ? `<b>${esc(s.name)}</b>` : esc(s.name);
+    h += `<span class="nm${side}" data-p="${q}" style="left:${pos(k)}%">${name}<small>${s.skip ? 'not stopping' : fmt(new Date(tm(s)))}</small></span>`;
+  });
+  h += `<b class="trn${x.live ? '' : ' sched'}${moving ? ' moving' : ''}" style="left:${f}%" title="Train">▶</b></div>`;
   const txt = i < 0 ? `Not started yet · leaves ${esc(p[0].name)} at ${fmt(p[0].est || p[0].sched)}`
-    : i >= p.length - 1 ? `Arrived at ${esc(p[p.length-1].name)}` : `Now between ${esc(p[i].name)} and ${esc(p[i+1].name)}${x.live ? '' : ' (by timetable)'}`;
-  return `<div class="where">${txt}${openRun === key(x) ? '' : ' · tap for stops'}</div>`;
+    : i >= n - 1 ? `Arrived at ${esc(p[n-1].name)}` : `Between ${esc(p[i].name)} and ${esc(p[next].name)}${x.live ? '' : ' (by timetable)'}`;
+  return h + `<div class="where">${txt}${openRun === key(x) ? '' : ' · tap for all stops'}</div>`;
+}
+// place station names on the line map without overlaps: your From/To always shown (second row if needed)
+function layoutTracks(){
+  document.querySelectorAll('.trk').forEach(trk => {
+    const placed = [], hit = (a, b) => a.left < b.right + 6 && b.left < a.right + 6 && a.top < b.bottom && b.top < a.bottom;
+    [...trk.querySelectorAll('.nm')].sort((a, b) => a.dataset.p - b.dataset.p).forEach(lab => {
+      const must = +lab.dataset.p < 2;
+      for (const top of must ? [30, 60] : [30]){
+        lab.style.top = top + 'px';
+        const r = lab.getBoundingClientRect();
+        if (!placed.some(o => hit(r, o))){ placed.push(r); if (top > 30) trk.classList.add('two'); return; }
+      }
+      lab.style.display = 'none';
+    });
+  });
 }
 function patternHTML(x){
   const p = stopTimes(x), pos = trainPosition(p);
