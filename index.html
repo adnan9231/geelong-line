@@ -65,11 +65,20 @@
 
   /* live */
   .hero{margin-top:16px;background:linear-gradient(145deg,#3a1544,#1d1426 70%);border-radius:24px;padding:20px;position:relative;cursor:pointer}
-  .hero .lbl{padding-right:92px;font-size:13px;color:#d8c4e2;text-transform:uppercase;letter-spacing:.08em}
+  .hero .lbl{font-size:13px;color:#d8c4e2;text-transform:uppercase;letter-spacing:.08em}
   .hero .big{font-size:64px;font-weight:780;letter-spacing:-.04em;line-height:1;margin:8px 0 6px;font-variant-numeric:tabular-nums}
   .hero .big small{font-size:24px;font-weight:600;letter-spacing:0;margin-left:4px;color:#e6d6ee}
   .hero .meta{display:flex;flex-wrap:wrap;gap:6px 14px;color:#eadff0;font-size:15px;margin-top:10px}
   .hero .meta b{font-weight:650}
+  .toprow{display:flex;align-items:center;gap:18px;margin-top:4px}
+  .toprow.hp{padding-right:84px}
+  .meta2{display:flex;flex-direction:column;gap:3px;font-size:14px;line-height:1.3;color:#eadff0;min-width:0;padding-left:14px;border-left:1px solid rgba(255,255,255,.14)}
+  .meta2 span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .toprow{gap:14px}
+  .toprow.hp .big{font-size:54px}
+  .toprow .big.wide{font-size:50px}
+  @media (max-width:400px){ .meta2{font-size:13px} }
+  .meta2 b{font-weight:650}
   .plat{position:absolute;right:18px;top:18px;text-align:center;background:rgba(255,255,255,.1);border-radius:16px;padding:8px 12px;min-width:64px}
   .plat small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#d8c4e2}
   .plat b{font-size:28px;font-weight:750}
@@ -90,6 +99,9 @@
   .row .b{font-size:13px;color:var(--muted);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .row .in{text-align:right;font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
   .row .in small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+  .row .tg{color:var(--accent);font-weight:600}
+  .rtrk{padding:0 14px 14px}
+  .rtrk .where{color:var(--muted)}
   .row.cx .t,.row.cx .a{text-decoration:line-through;color:var(--muted)}
 
   /* stopping pattern */
@@ -125,7 +137,7 @@
   .toggle{display:flex;align-items:center;justify-content:space-between;padding:12px 2px;border-top:1px solid var(--line);margin-top:6px}
   .toggle input{width:auto;transform:scale(1.3)}
 
-  .trip{margin-top:12px;background:var(--card);border-radius:var(--r);padding:4px 6px 4px 16px;display:flex;align-items:center;gap:10px}
+  .trip{margin-top:4px;background:var(--card);border-radius:var(--r);padding:4px 6px 4px 16px;display:flex;align-items:center;gap:10px}
   .trip .stops{flex:1;min-width:0}
   .sp{position:relative;padding:9px 0}
   .sp small{display:block;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
@@ -145,24 +157,24 @@
   .stat{display:flex;justify-content:space-between;gap:12px;padding:11px 2px;border-top:1px solid var(--line);font-size:15px}
   .stat span:last-child{color:var(--muted);text-align:right}
   .pill.coach{background:rgba(120,170,255,.14);color:#9cc0ff}
-  /* line map */
-  .trk{position:relative;height:74px;margin:16px 6px 0}
-  .trk .ln{position:absolute;left:0;right:0;top:14px;height:4px;border-radius:2px;background:rgba(255,255,255,.14)}
-  .trk .seg{position:absolute;top:13px;height:6px;border-radius:3px;background:rgba(192,106,216,.55)}
-  .trk .done{position:absolute;left:0;top:14px;height:4px;border-radius:2px;background:var(--ok);opacity:.85}
-  .trk .dt{position:absolute;top:10px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:#2a2134;border:2px solid rgba(255,255,255,.45)}
-  .trk .dt.past{background:var(--ok);border-color:var(--ok)}
-  .trk .dt.mine{width:16px;height:16px;margin-left:-8px;top:8px;background:var(--accent);border-color:#fff}
-  .trk .dt.skip{opacity:.35;border-style:dashed}
-  .trk.two{height:104px}
-  .trk .nm{position:absolute;top:30px;font-size:11px;line-height:1.25;color:#d8c4e2;white-space:nowrap;transform:translateX(-50%);text-align:center}
-  .trk .nm.l{transform:none;text-align:left} .trk .nm.r{transform:translateX(-100%);text-align:right}
-  .trk .nm b{font-weight:700;color:#fff} .trk .nm small{display:block;color:#a99bb5;font-size:11px}
-  .trk .trn{position:absolute;top:2px;width:30px;height:20px;margin-left:-15px;border-radius:7px 12px 12px 7px;background:var(--ok);color:#06281b;
-    display:grid;place-items:center;font-size:11px;font-weight:800;box-shadow:0 0 0 4px rgba(61,220,151,.22);transition:left 1s ease}
-  .trk .trn.sched{background:#cfc6da;box-shadow:0 0 0 4px rgba(255,255,255,.12);color:#2a2134}
-  .trk .trn.moving{animation:chug 1.2s ease-in-out infinite}
-  @keyframes chug{50%{transform:translateX(3px)}}
+  /* snake line map */
+  .snake{display:block;width:100%;max-width:420px;margin:14px auto 8px;overflow:visible}
+  .snake .s-base{fill:none;stroke:rgba(255,255,255,.16);stroke-width:4;stroke-linecap:round}
+  .snake .s-trip{fill:none;stroke:rgba(192,106,216,.65);stroke-width:6;stroke-linecap:round}
+  .snake .s-done{fill:none;stroke:#3ddc97;stroke-width:4;stroke-linecap:round;opacity:.85}
+  .snake .s-dot{fill:#2a2134;stroke:rgba(255,255,255,.5);stroke-width:2}
+  .snake .s-dot.past{fill:#3ddc97;stroke:#3ddc97}
+  .snake .s-dot.mine{fill:#c06ad8;stroke:#fff}
+  .snake .s-dot.skip{opacity:.35;stroke-dasharray:2 2}
+  .snake .s-nm{font-size:10.5px;fill:#d8c4e2;text-anchor:middle}
+  .snake .s-nm.past{fill:#9a8fa8} .snake .s-nm.mine{fill:#fff;font-weight:700}
+  .snake .s-tm{font-size:9.5px;fill:#a99bb5;font-weight:400}
+  .snake .tb{fill:#3b3943} .snake .tr{fill:#d5232f} .snake .tp{fill:#7d2a8c}
+  .snake .tw{fill:#bfe3f5} .snake .tl{fill:#ffe27a} .snake .tk{fill:#15131a}
+  .snake .s-train{filter:drop-shadow(0 0 3px rgba(61,220,151,.75))}
+  .snake .s-train.sched{filter:drop-shadow(0 0 2px rgba(255,255,255,.35))}
+  .snake .s-train.moving{animation:chug 1.2s ease-in-out infinite}
+  @keyframes chug{50%{transform:translateX(1.5px)}}
   .where{margin-top:6px;font-size:13px;color:#e6d6ee}
 </style>
 </head>
@@ -176,10 +188,6 @@
   </div>
 </div>
 
-<div class="seg" id="modeSeg">
-  <button data-m="live">Live</button>
-  <button data-m="tt">Timetable</button>
-</div>
 
 <div class="trip">
   <div class="stops">
@@ -220,12 +228,26 @@ const store = {
   get(k,d){ try{ const v = localStorage.getItem('gl.'+k); return v==null ? d : JSON.parse(v); }catch{ return d; } },
   set(k,v){ try{ localStorage.setItem('gl.'+k, JSON.stringify(v)); }catch{} }
 };
-let st = store.get('st2', { mode:'live', from:'Tarneit', to:'Southern Cross' });
-let saved = store.get('saved', [{ from:'Tarneit', to:'Southern Cross' }, { from:'Southern Cross', to:'Tarneit' }]);
+const HOME = 'West Tarneit', CITY = 'Southern Cross';
+const DEFAULT_TRIPS = [{ from: HOME, to: CITY }, { from: CITY, to: HOME }];
+let st = store.get('st2', { mode:'live', from: HOME, to: CITY });
+st.mode = 'live';   // the app is always live (no Live/Timetable buttons)
+let saved = store.get('saved', DEFAULT_TRIPS);
+// one-time switch: if this phone still has the old untouched defaults (Tarneit), move them to West Tarneit
+if (!store.get('defaultsV2', false)){
+  const oldDefaults = JSON.stringify([{ from:'Tarneit', to:'Southern Cross' }, { from:'Southern Cross', to:'Tarneit' }]);
+  if (JSON.stringify(saved) === oldDefaults){
+    saved = DEFAULT_TRIPS; store.set('saved', saved);
+    if (st.from === 'Tarneit' && st.to === 'Southern Cross') st.from = HOME;
+    else if (st.from === 'Southern Cross' && st.to === 'Tarneit') st.to = HOME;
+  }
+  store.set('st2', st); store.set('defaultsV2', true);
+}
 let demoPref = store.get('demo', false);
 let TT = null, ttDemo = false, ttErr = null;        // timetable
 let RT = null, rtAt = null, rtErr = null;           // realtime: Map trip_id -> update
-let data = null, loading = false, pages = 0, openRun = null, lastUpdated = null;
+let data = null, loading = false, pages = 0, lastUpdated = null;
+const openRuns = new Set();   // trains whose track / stop list is open (several at once)
 const save = () => store.set('st2', st);
 const isDemo = () => demoPref || ttDemo;
 
@@ -396,12 +418,12 @@ function demoRealtime(){
 function compute(){
   if (!TT) return null;
   const live = st.mode === 'live';
-  const want = live ? 8 + pages*8 : 20 + pages*20;
+  const want = live ? 3 : 20 + pages*20;
   const now = Date.now();
   const all = journeys(st.from, st.to, live ? 1 : 3 + pages*3);
   all.forEach(x => { applyRT(x); x.when = (live && x.est) || x.sched; });
   const list = all.filter(x => x.when.getTime() > now - 60000).sort((a,b) => a.when - b.when);
-  return { list: list.slice(0, want), more: list.length > want || !live };
+  return { list: list.slice(0, want), more: !live };
 }
 
 /* ---------- render ---------- */
@@ -452,7 +474,7 @@ function render(){
   m.innerHTML = st.mode === 'tt' ? renderTT() : renderLive();
   layoutTracks();
   const mb = $('moreBtn'); if (mb) mb.onclick = () => { pages++; data = compute(); render(); };
-  m.querySelectorAll('[data-run]').forEach(b => b.onclick = () => { openRun = openRun === b.dataset.run ? null : b.dataset.run; render(); });
+  m.querySelectorAll('[data-run]').forEach(b => b.onclick = () => { const k = b.dataset.run; openRuns.has(k) ? openRuns.delete(k) : openRuns.add(k); render(); });
   foot();
 }
 function renderTT(){
@@ -474,14 +496,20 @@ function renderLive(){
   const first = data.list.find(x => !x.cx) || data.list[0];
   const [n,u] = cdown(first.when);
   let h = `<div class="hero" data-run="${esc(key(first))}">
-    ${first.plat ? `<div class="plat"><small>Platform</small><b>${esc(first.plat)}</b></div>` : ''}
     <div class="lbl">Next train to ${esc(st.to)}</div>
-    <div class="big">${n}${u ? `<small>${u}</small>` : ''}</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap">${pill(first)}${coachTag(first)}</div>
-    <div class="meta"><span>Departs <b>${fmt(first.when)}</b>${first.est && Math.abs(first.est-first.sched) >= 120000 ? ` <s style="opacity:.6">${fmt(first.sched)}</s>` : ''}</span>
-      <span>Arrives <b>${fmt(arrOf(first,true))}</b></span><span>${durOf(first,true)} min</span><span>to ${esc(first.head)}</span></div>
+    <div class="toprow">
+      <div><div class="big${String(n).length > 2 ? ' wide' : ''}">${n}${u ? `<small>${u}</small>` : ''}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${pill(first)}${coachTag(first)}</div></div>
+      <div class="meta2">
+        <span>Departs <b>${fmt(first.when)}</b></span>${first.est && Math.abs(first.est-first.sched) >= 120000 ? `<span style="opacity:.6;font-size:12px">was <s>${fmt(first.sched)}</s></span>` : ''}
+        <span>Arrives <b>${fmt(arrOf(first,true))}</b></span>
+        <span>${durOf(first,true)} min</span>
+        <span>to ${esc(first.head)}</span>
+        ${first.plat ? `<span>Platform <b>${esc(first.plat)}</b></span>` : ''}
+      </div>
+    </div>
     ${wherePill(first)}
-    ${openRun === key(first) ? patternHTML(first) : ''}
+    ${openRuns.has(key(first)) ? patternHTML(first) : ''}
   </div><h2>Following trains</h2><div class="list">`;
   const rest = data.list.filter(x => x !== first);
   if (!rest.length) h += `<div class="empty">No more trains found.</div>`;
@@ -489,9 +517,9 @@ function renderLive(){
     const m = mins(x.when), late = x.est ? Math.round((x.est - x.sched)/60000) : 0;
     h += `<div class="row${x.cx ? ' cx':''}"><button data-run="${esc(key(x))}">
       <div class="t">${fmt(x.when)}${late >= 2 ? `<s>${fmt(x.sched)}</s>` : ''}</div>
-      <div><div class="a">Arr ${fmt(arrOf(x,true))} · ${durOf(x,true)} min</div><div class="b">${pill(x)}${coachTag(x)}${x.plat ? `<span>Plat ${esc(x.plat)}</span>` : ''}</div></div>
+      <div><div class="a">Arr ${fmt(arrOf(x,true))} · ${durOf(x,true)} min</div><div class="b">${pill(x)}${coachTag(x)}${x.plat ? `<span>Plat ${esc(x.plat)}</span>` : ''}${x.cx ? '' : `<span class="tg">${openRuns.has(key(x)) ? 'Hide track ▴' : 'Show track ▾'}</span>`}</div></div>
       <div class="in">${x.cx ? '—' : m <= 0 ? 'Now' : m < 60 ? `${m}<small>min</small>` : `${Math.floor(m/60)}h ${m%60}<small>&nbsp;</small>`}</div>
-    </button>${openRun === key(x) ? patternHTML(x) : ''}</div>`;
+    </button>${openRuns.has(key(x)) && !x.cx ? `<div class="rtrk">${wherePill(x, true)}</div>` : ''}</div>`;
   });
   if (data.more) h += `<button class="more" id="moreBtn">Show more</button>`;
   return h + '</div>';
@@ -501,40 +529,82 @@ function stopTimes(x){
     est: x.stopsRT ? x.stopsRT.est[k] : null, skip: x.stopsRT ? x.stopsRT.skip[k] : false }));
 }
 function trainPosition(p){ const now = Date.now(); let last = -1; p.forEach((s,i) => { if (!s.skip && (s.est || s.sched).getTime() <= now) last = i; }); return last; }
-function wherePill(x){
+function wherePill(x, inRow){
   if (x.cx) return '';
   const p = stopTimes(x), n = p.length, i = trainPosition(p);
-  const pos = k => n > 1 ? k / (n - 1) * 100 : 0;
   const tm = s => (s.est || s.sched).getTime();
-  // train position along the line (0-100%), interpolated between the last and next stations by time
-  let f, moving = false, next = -1;
-  if (i < 0) f = 0;
-  else if (i >= n - 1) f = 100;
+  // snake layout: rows of 4 stations, left→right then right→left, joined by U-turns
+  const PER = 4, W = 320, X0 = 44, X1 = 276, RH = 80, Y0 = 26, R = RH / 2;
+  const dx = (X1 - X0) / (PER - 1);
+  const pt = k => { const r = Math.floor(k / PER), c = k % PER; return { x: r % 2 ? X1 - c * dx : X0 + c * dx, y: Y0 + r * RH, r }; };
+  // point + heading at fraction t along the segment from station k to k+1
+  function at(k, t){
+    const A = pt(k), B = pt(k + 1);
+    if (A.r === B.r) return { x: A.x + (B.x - A.x) * t, y: A.y, h: B.x >= A.x ? 0 : 180 };
+    const cx = A.x, cy = A.y + R, right = A.r % 2 === 0;
+    const ang = (right ? -90 + 180 * t : -90 - 180 * t) * Math.PI / 180;
+    return { x: cx + R * Math.cos(ang), y: cy + R * Math.sin(ang), h: (right ? ang * 180 / Math.PI + 90 : ang * 180 / Math.PI - 90) };
+  }
+  function seg(k, t0, t1){
+    const A = at(k, t0), B = at(k, t1), same = pt(k).r === pt(k + 1).r;
+    if (same) return `M${A.x.toFixed(1)} ${A.y}L${B.x.toFixed(1)} ${B.y}`;
+    const sweep = pt(k).r % 2 === 0 ? 1 : 0;
+    return `M${A.x.toFixed(1)} ${A.y.toFixed(1)}A${R} ${R} 0 0 ${sweep} ${B.x.toFixed(1)} ${B.y.toFixed(1)}`;
+  }
+  const run = (k0, f0, k1, f1) => { let d = ''; for (let k = k0; k <= k1 && k < n - 1; k++) d += seg(k, k === k0 ? f0 : 0, k === k1 ? f1 : 1); return d; };
+  // where the train is
+  let tk = 0, tf = 0, next = -1, moving = false;
+  if (i < 0){ tk = 0; tf = 0; }
+  else if (i >= n - 1){ tk = n - 2; tf = 1; }
   else {
     next = i + 1; while (next < n - 1 && p[next].skip) next++;
     const t0 = tm(p[i]), t1 = tm(p[next]), now = Date.now();
     const frac = t1 > t0 ? Math.min(1, Math.max(0, (now - t0) / (t1 - t0))) : 0;
-    f = pos(i) + frac * (pos(next) - pos(i)); moving = frac > 0 && frac < 1;
+    const span = (next - i) * frac; tk = Math.min(n - 2, i + Math.floor(span)); tf = span - Math.floor(span);
+    if (i + Math.floor(span) >= n - 1){ tk = n - 2; tf = 1; }
+    moving = frac > 0 && frac < 1;
   }
-  // which station names fit: your stations first, then the next stop, then the two ends
-  const prio = [x.i, x.j, next, 0, n - 1].filter((k, q, a) => k >= 0 && a.indexOf(k) === q);
-  let h = `<div class="trk" aria-label="Train position on the line">
-    <div class="ln"></div>
-    <div class="seg" style="left:${pos(x.i)}%;width:${pos(x.j) - pos(x.i)}%"></div>
-    <div class="done" style="width:${f}%"></div>`;
+  const rows = Math.ceil(n / PER), H = Y0 + (rows - 1) * RH + 46;
+  let g = `<svg class="snake" viewBox="0 0 ${W} ${H}" role="img" aria-label="Train position on the line">`;
+  g += `<path d="${run(0, 0, n - 2, 1)}" class="s-base"/>`;
+  if (x.j > x.i) g += `<path d="${run(x.i, 0, x.j - 1, 1)}" class="s-trip"/>`;
+  if (i >= 0) g += `<path d="${run(0, 0, tk, tf)}" class="s-done"/>`;
   p.forEach((s, k) => {
-    const cls = [k === x.i || k === x.j ? 'mine' : '', k <= i && !s.skip ? 'past' : '', s.skip ? 'skip' : ''].join(' ');
-    h += `<i class="dt ${cls}" style="left:${pos(k)}%" title="${esc(s.name)}"></i>`;
+    const P = pt(k), mine = k === x.i || k === x.j, past = k <= i && !s.skip;
+    g += `<circle cx="${P.x}" cy="${P.y}" r="${mine ? 6.5 : 4.5}" class="s-dot${mine ? ' mine' : ''}${past ? ' past' : ''}${s.skip ? ' skip' : ''}"/>`;
+    const words = s.name.split(' '), two = s.name.length > 10 && words.length > 1;
+    const l1 = two ? words.slice(0, Math.ceil(words.length / 2)).join(' ') : s.name, l2 = two ? words.slice(Math.ceil(words.length / 2)).join(' ') : '';
+    g += `<text x="${P.x}" y="${P.y + 20}" class="s-nm${mine ? ' mine' : ''}${past ? ' past' : ''}">${esc(l1)}${l2 ? `<tspan x="${P.x}" dy="11">${esc(l2)}</tspan>` : ''}<tspan x="${P.x}" dy="12" class="s-tm">${s.skip ? 'not stopping' : fmt(new Date(tm(s)))}</tspan></text>`;
   });
-  prio.forEach((k, q) => {
-    const s = p[k], side = pos(k) < 10 ? ' l' : pos(k) > 90 ? ' r' : '';
-    const name = k === x.i || k === x.j ? `<b>${esc(s.name)}</b>` : esc(s.name);
-    h += `<span class="nm${side}" data-p="${q}" style="left:${pos(k)}%">${name}<small>${s.skip ? 'not stopping' : fmt(new Date(tm(s)))}</small></span>`;
-  });
-  h += `<b class="trn${x.live ? '' : ' sched'}${moving ? ' moving' : ''}" style="left:${f}%" title="Train">▶</b></div>`;
+  const T = at(tk, tf), flip = Math.cos(T.h * Math.PI / 180) < -0.01;
+  const tr = flip ? `translate(${T.x.toFixed(1)} ${T.y.toFixed(1)}) rotate(${(T.h - 180).toFixed(1)}) scale(-1.25 1.25)` : `translate(${T.x.toFixed(1)} ${T.y.toFixed(1)}) rotate(${T.h.toFixed(1)}) scale(1.25)`;
+  g += `<g transform="${tr}"><g class="s-train${x.live ? '' : ' sched'}${moving ? ' moving' : ''}">
+    <defs><linearGradient id="vlBody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9a4aa8"/><stop offset=".55" stop-color="#6e1f7c"/><stop offset="1" stop-color="#4b1257"/></linearGradient>
+      <linearGradient id="vlGlass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5d7c92"/><stop offset="1" stop-color="#16121e"/></linearGradient></defs>
+    <rect x="-29.2" y="-5.5" width="1.4" height="9.5" rx=".4" fill="#241b2b"/>
+    <rect x="-12" y="-8.7" width="7" height="1.6" rx=".5" fill="#3d1046"/><rect x="0" y="-8.4" width="5" height="1.3" rx=".5" fill="#3d1046"/>
+    <path d="M-28 -7.2 H12.5 C18.5 -7.2 23.8 -4.4 27.6 0.6 V5 H-28 Z" fill="url(#vlBody)"/>
+    <path d="M-28 -7.2 H12.5 C15 -7.2 17.3 -6.7 19.4 -5.9 H-28 Z" fill="#b77cc2" opacity=".55"/>
+    <rect x="-26" y="-4.7" width="37.6" height="3.6" rx=".6" fill="#1b1424"/>
+    <rect x="-25" y="-4.2" width="5.2" height="2.6" rx=".4" fill="url(#vlGlass)"/><rect x="-14.6" y="-4.2" width="5.2" height="2.6" rx=".4" fill="url(#vlGlass)"/>
+    <rect x="-8.6" y="-4.2" width="5.2" height="2.6" rx=".4" fill="url(#vlGlass)"/><rect x="-2.6" y="-4.2" width="5.2" height="2.6" rx=".4" fill="url(#vlGlass)"/>
+    <rect x="8.2" y="-4.2" width="3" height="2.6" rx=".4" fill="url(#vlGlass)"/>
+    <rect x="-19.4" y="-5" width="4.2" height="9.4" rx=".5" fill="none" stroke="#2c0a33" stroke-width=".5"/>
+    <rect x="3.4" y="-5" width="4.2" height="9.4" rx=".5" fill="none" stroke="#2c0a33" stroke-width=".5"/>
+    <path d="M14.6 -4.7 C19.4 -4.6 22.8 -2.9 25.4 -0.4 H14.6 Z" fill="url(#vlGlass)"/>
+    <path d="M15.6 -4.1 C18 -4 19.6 -3.5 21 -2.8" stroke="#cfe6f4" stroke-width=".5" fill="none" opacity=".8"/>
+    <rect x="-28" y="0.7" width="55.6" height=".5" fill="#ffffff" opacity=".85"/>
+    <rect x="-28" y="1.4" width="55.6" height="1.5" fill="#e0213a"/>
+    <path d="M24.6 2.9 h2.4 v1.6 h-3 z" fill="#ffd34d"/>
+    <circle cx="26.2" cy="1.9" r=".75" fill="#fff6c4"/>
+    <rect x="-28" y="5" width="55.6" height="1.3" fill="#231a29"/>
+    <rect x="-23.5" y="5.8" width="10" height="2.2" rx=".8" fill="#141017"/><rect x="12" y="5.8" width="10" height="2.2" rx=".8" fill="#141017"/>
+    <circle cx="-21" cy="7.6" r="1.4" fill="#3a3340"/><circle cx="-16" cy="7.6" r="1.4" fill="#3a3340"/>
+    <circle cx="14.5" cy="7.6" r="1.4" fill="#3a3340"/><circle cx="19.5" cy="7.6" r="1.4" fill="#3a3340"/>
+  </g></g></svg>`;
   const txt = i < 0 ? `Not started yet · leaves ${esc(p[0].name)} at ${fmt(p[0].est || p[0].sched)}`
     : i >= n - 1 ? `Arrived at ${esc(p[n-1].name)}` : `Between ${esc(p[i].name)} and ${esc(p[next].name)}${x.live ? '' : ' (by timetable)'}`;
-  return h + `<div class="where">${txt}${openRun === key(x) ? '' : ' · tap for all stops'}</div>`;
+  return g + `<div class="where">${txt}${inRow || openRuns.has(key(x)) ? '' : ' · tap for all stops'}</div>`;
 }
 // place station names on the line map without overlaps: your From/To always shown (second row if needed)
 function layoutTracks(){
@@ -584,13 +654,13 @@ async function refresh(full){
   loading = true; $('refreshBtn').classList.add('spin'); render();
   if (full) TT = null;
   await loadTimetable();
-  if (!TT.stations.some(n => same(n, st.from))) st.from = 'Tarneit';
-  if (!TT.stations.some(n => same(n, st.to)) || same(st.to, st.from)) st.to = same(st.from, 'Southern Cross') ? 'Tarneit' : 'Southern Cross';
+  if (!TT.stations.some(n => same(n, st.from))) st.from = HOME;
+  if (!TT.stations.some(n => same(n, st.to)) || same(st.to, st.from)) st.to = same(st.from, CITY) ? HOME : CITY;
   if (st.mode === 'live') await loadRealtime();
   data = compute(); lastUpdated = new Date();
   loading = false; $('refreshBtn').classList.remove('spin'); render();
 }
-function reset(){ pages = 0; openRun = null; data = TT ? compute() : null; render(); if (st.mode === 'live' && !rtAt) refresh(); }
+function reset(){ pages = 0; openRuns.clear(); data = TT ? compute() : null; render(); if (st.mode === 'live' && !rtAt) refresh(); }
 
 setInterval(() => { if (st.mode === 'live' && document.visibilityState === 'visible') refresh(); }, LIVE_REFRESH);
 setInterval(() => { if (TT && !loading){ data = compute(); render(); } }, 15000);
@@ -598,7 +668,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 
 /* ---------- controls ---------- */
 document.querySelectorAll('#modeSeg button').forEach(b => b.onclick = () => { st.mode = b.dataset.m; save(); reset(); });
-$('fromSel').onchange = e => { st.from = e.target.value; if (same(st.from, st.to)) st.to = same(st.from,'Southern Cross') ? 'Tarneit' : 'Southern Cross'; save(); reset(); };
+$('fromSel').onchange = e => { st.from = e.target.value; if (same(st.from, st.to)) st.to = same(st.from, CITY) ? HOME : CITY; save(); reset(); };
 $('toSel').onchange = e => { st.to = e.target.value; save(); reset(); };
 $('swapBtn').onclick = () => { [st.from, st.to] = [st.to, st.from]; save(); reset(); };
 $('refreshBtn').onclick = () => refresh(true);
