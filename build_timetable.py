@@ -98,6 +98,110 @@ def ymd(d):
     return int(d.strftime('%Y%m%d'))
 
 
+
+# ---------- route geometry (for the map view) ----------
+from math import radians, sin, cos, atan2, sqrt
+
+def hav_km(a, b):
+    la1, lo1, la2, lo2 = map(radians, (a[0], a[1], b[0], b[1]))
+    h = sin((la2 - la1) / 2) ** 2 + cos(la1) * cos(la2) * sin((lo2 - lo1) / 2) ** 2
+    return 6371.0 * 2 * atan2(sqrt(h), sqrt(1 - h))
+
+
+def simplify(pts, tol_m=8.0):
+    """Douglas-Peucker on lat/lon using a local metre projection."""
+    if len(pts) < 3:
+        return pts
+    lat0 = radians(sum(p[0] for p in pts) / len(pts))
+    xy = [(p[1] * 111320 * cos(lat0), p[0] * 110540) for p in pts]
+    keep = [False] * len(pts); keep[0] = keep[-1] = True
+    stack = [(0, len(pts) - 1)]
+    while stack:
+        i, j = stack.pop()
+        (x1, y1), (x2, y2) = xy[i], xy[j]
+        dx, dy = x2 - x1, y2 - y1; L = (dx * dx + dy * dy) ** 0.5 or 1e-9
+        best, bi = -1, -1
+        for k in range(i + 1, j):
+            d = abs(dy * xy[k][0] - dx * xy[k][1] + x2 * y1 - y2 * x1) / L
+            if d > best:
+                best, bi = d, k
+        if best > tol_m:
+            keep[bi] = True; stack += [(i, bi), (bi, j)]
+    return [p for p, k in zip(pts, keep) if k]
+
+
+def project_km(shape, cum, pt):
+    """Distance (km) along the shape of the closest point to pt."""
+    lat0 = radians(pt[0])
+    fx = lambda p: (p[1] * 111.32 * cos(lat0), p[0] * 110.54)
+    P = fx(pt); best = (1e18, 0.0)
+    for i in range(len(shape) - 1):
+        A, B = fx(shape[i]), fx(shape[i + 1])
+        dx, dy = B[0] - A[0], B[1] - A[1]; L2 = dx * dx + dy * dy or 1e-12
+        t = max(0.0, min(1.0, ((P[0] - A[0]) * dx + (P[1] - A[1]) * dy) / L2))
+        qx, qy = A[0] + t * dx, A[1] + t * dy
+        d = (P[0] - qx) ** 2 + (P[1] - qy) ** 2
+        if d < best[0]:
+            best = (d, cum[i] + t * (cum[i + 1] - cum[i]))
+    return best[1]
+
+
+def geometry(files, stops, stop_station, station_of_trip_ids, trips, routes):
+    # station coordinates: use the parent station if there is one, else average the platform stops
+    acc = {}
+    for sid, st in stop_station.items():
+        s = stops[sid]
+        src = stops.get(s.get('parent_station') or '') or s
+        try:
+            acc.setdefault(st, []).append((float(src['stop_lat']), float(src['stop_lon'])))
+        except (KeyError, ValueError):
+            pass
+    coords = {st: (round(sum(p[0] for p in v) / len(v), 6), round(sum(p[1] for p in v) / len(v), 6)) for st, v in acc.items()}
+    # candidate shapes: rail trips (not coaches) on the line
+    shape_ids = set()
+    for tid in station_of_trip_ids:
+        t = trips.get(tid) or {}
+        rtype = str(routes.get(t.get('route_id'), {}).get('route_type', '2'))
+        if t.get('shape_id') and (rtype == '2' or rtype.startswith('1')):
+            shape_ids.add(t['shape_id'])
+    pts = {}
+    for r in rows(files, 'shapes.txt'):
+        if r['shape_id'] in shape_ids:
+            pts.setdefault(r['shape_id'], []).append((int(r['shape_pt_sequence']), float(r['shape_pt_lat']), float(r['shape_pt_lon'])))
+    if not pts or len(coords) < 2:
+        return None
+    sc, wp = coords.get(0), coords.get(len(LINE) - 1)
+    def score(seq):
+        line = [(p[1], p[2]) for p in sorted(seq)]
+        length = sum(hav_km(line[k], line[k + 1]) for k in range(len(line) - 1))
+        return length, line
+    best = max((score(v) for v in pts.values()), key=lambda x: x[0])[1]
+    # orient Southern Cross → Waurn Ponds
+    if sc and hav_km(best[0], sc) > hav_km(best[-1], sc):
+        best.reverse()
+    shape = simplify(best)
+    cum = [0.0]
+    for k in range(len(shape) - 1):
+        cum.append(cum[-1] + hav_km(shape[k], shape[k + 1]))
+    km = [project_km(shape, cum, coords[i]) if i in coords else None for i in range(len(LINE))]
+    # trim to the Geelong line only (a Warrnambool shape carries on well past Waurn Ponds)
+    known = [k for k in km if k is not None]
+    lo, hi = min(known) - 0.3, max(known) + 0.3
+    keep = [p for p, c in zip(shape, cum) if lo <= c <= hi]
+    if len(keep) >= 2 and len(keep) < len(shape):
+        shape = keep
+        cum = [0.0]
+        for k in range(len(shape) - 1):
+            cum.append(cum[-1] + hav_km(shape[k], shape[k + 1]))
+        km = [project_km(shape, cum, coords[i]) if i in coords else None for i in range(len(LINE))]
+    km = [round(k, 3) if k is not None else None for k in km]
+    return {
+        'shape': [[round(a, 5), round(b, 5)] for a, b in shape],
+        'stationLatLon': [list(coords[i]) if i in coords else None for i in range(len(LINE))],
+        'stationKm': km,
+    }
+
+
 def build(files, today):
     stops = {s['stop_id']: s for s in rows(files, 'stops.txt')}
     idx_by_name = {n.lower(): i for i, n in enumerate(LINE)}
@@ -168,7 +272,15 @@ def build(files, today):
     for sid, i in svc_ids.items():
         services[i] = sorted(ymd(d) for d in active[sid])
     out_trips.sort(key=lambda t: (t[4][0][1], t[0]))
+    geo = None
+    try:
+        geo = geometry(files, stops, stop_station, [t[0] for t in out_trips], trips, routes)
+    except Exception as e:   # the map is optional; never let it break the timetable
+        log('Map geometry skipped:', e)
+    if geo:
+        log(f"Map: {len(geo['shape'])} shape points, stations at km {geo['stationKm']}")
     return {
+        'geo': geo,
         'generated': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
         'from': ymd(start), 'to': ymd(end),
         'stations': LINE,

@@ -180,6 +180,22 @@
   @keyframes ping{0%{transform:scale(.6);opacity:.45}100%{transform:scale(1.6);opacity:0}}
   @keyframes chug{50%{transform:translateX(1.5px)}}
   .where{margin-top:6px;font-size:13px;color:#e6d6ee}
+  /* line / map switch and real map */
+  .vt{display:flex;justify-content:flex-end;gap:4px;margin:14px 0 -4px}
+  .vt button{padding:5px 12px;border-radius:999px;font-size:12.5px;font-weight:600;color:var(--muted);background:rgba(255,255,255,.06)}
+  .vt button.on{background:rgba(255,255,255,.16);color:#fff}
+  .lmap{margin-top:12px;border-radius:14px;overflow:hidden;min-height:280px;background:#1a1622}
+  .lmap .lmapnode{height:280px}
+  .lmap .msg{padding:24px 16px;color:var(--muted);font-size:13px;text-align:center}
+  .trainpin{width:30px;height:30px;display:grid;place-items:center}
+  .trainpin i{position:absolute;width:30px;height:30px;border-radius:50%;background:rgba(61,220,151,.3);animation:ping2 1.6s ease-out infinite}
+  .trainpin b{position:relative;width:16px;height:16px;border-radius:50%;background:#3ddc97;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+  .trainpin svg{position:absolute;width:30px;height:30px}
+  .trainpin.sched b{background:#9a93a8} .trainpin.sched i{background:rgba(154,147,168,.3)}
+  @keyframes ping2{0%{transform:scale(.5);opacity:.6}100%{transform:scale(1.4);opacity:0}}
+  .leaflet-container{font:12px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .leaflet-tooltip.stn{background:#1a1622;color:#f4f1f8;border:0;box-shadow:0 1px 4px rgba(0,0,0,.4);font-weight:600;padding:3px 7px}
+  .leaflet-tooltip.stn:before{display:none}
 </style>
 </head>
 <body>
@@ -252,7 +268,8 @@ let demoPref = store.get('demo', false);
 let TT = null, ttDemo = false, ttErr = null;        // timetable
 let RT = null, rtAt = null, rtErr = null;           // realtime: Map trip_id -> update
 let data = null, loading = false, pages = 0, lastUpdated = null;
-const openRuns = new Set();   // trains whose track / stop list is open (several at once)
+const openRuns = new Set();
+const mapKeys = new Set();     // trains shown on the real map instead of the line diagram   // trains whose track / stop list is open (several at once)
 const save = () => store.set('st2', st);
 const isDemo = () => demoPref || ttDemo;
 
@@ -480,6 +497,13 @@ function render(){
   layoutTracks();
   const mb = $('moreBtn'); if (mb) mb.onclick = () => { pages++; data = compute(); render(); };
   m.querySelectorAll('[data-run]').forEach(b => b.onclick = () => { const k = b.dataset.run; openRuns.has(k) ? openRuns.delete(k) : openRuns.add(k); render(); });
+  m.querySelectorAll('[data-view]').forEach(b => b.onclick = e => {
+    e.stopPropagation();
+    const k = b.dataset.k;
+    if (b.dataset.view === 'map') mapKeys.add(k); else mapKeys.delete(k);
+    render();
+  });
+  attachMaps();
   foot();
 }
 function renderTT(){
@@ -590,7 +614,12 @@ function wherePill(x, inRow){
   </g></g></svg>`;
   const txt = i < 0 ? `Not started yet · leaves ${esc(p[0].name)} at ${fmt(p[0].est || p[0].sched)}`
     : i >= n - 1 ? `Arrived at ${esc(p[n-1].name)}` : `Between ${esc(p[i].name)} and ${esc(p[next].name)}${x.live ? '' : ' (by timetable)'}`;
-  return g + `<div class="where">${txt}${inRow || openRuns.has(key(x)) ? '' : ' · tap for all stops'}</div>`;
+  const k = key(x), onMap = mapKeys.has(k);
+  const geo = TT && TT.geo, km = geo && geo.stationKm;
+  const dist = km && km[x.t[4][x.i][0]] != null && km[x.t[4][x.j][0]] != null ? Math.abs(km[x.t[4][x.j][0]] - km[x.t[4][x.i][0]]) : null;
+  const sw = `<div class="vt"><button data-view="line" data-k="${esc(k)}" class="${onMap ? '' : 'on'}">Line</button><button data-view="map" data-k="${esc(k)}" class="${onMap ? 'on' : ''}">Map</button></div>`;
+  return sw + (onMap ? `<div class="lmap" data-k="${esc(k)}"></div>` : g)
+    + `<div class="where">${txt}${dist != null ? ` · ${dist.toFixed(1)} km trip` : ''}${inRow || openRuns.has(k) ? '' : ' · tap for all stops'}</div>`;
 }
 // place station names on the line map without overlaps: your From/To always shown (second row if needed)
 function layoutTracks(){
@@ -634,6 +663,107 @@ function renderStatus(){
   $('statusList').innerHTML = rows.map(r => `<div class="stat"><span>${esc(r[0])}</span><span>${esc(r[1])}</span></div>`).join('');
 }
 
+/* ---------- real map (Leaflet + OpenStreetMap) ---------- */
+let leafletReady = null;
+const mapCache = new Map();   // key -> { node, map, layer, fitted }
+function ensureLeaflet(){
+  if (window.L) return Promise.resolve();
+  if (leafletReady) return leafletReady;
+  const load = (el) => new Promise((ok, fail) => { el.onload = ok; el.onerror = () => fail(new Error('Map library could not load')); document.head.appendChild(el); });
+  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+  const js = document.createElement('script'); js.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+  leafletReady = Promise.all([load(css), load(js)]).catch(e => { leafletReady = null; throw e; });
+  return leafletReady;
+}
+function geoCum(){
+  const g = TT.geo; if (g.cum) return g.cum;
+  const R = 6371, rad = d => d * Math.PI / 180, cum = [0];
+  for (let k = 1; k < g.shape.length; k++){
+    const [a1, o1] = g.shape[k-1], [a2, o2] = g.shape[k];
+    const h = Math.sin(rad(a2-a1)/2)**2 + Math.cos(rad(a1))*Math.cos(rad(a2))*Math.sin(rad(o2-o1)/2)**2;
+    cum.push(cum[k-1] + 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1-h)));
+  }
+  return g.cum = cum;
+}
+function atKm(km){            // point on the real track at a distance, plus the track's bearing there
+  const g = TT.geo, cum = geoCum(), sh = g.shape;
+  km = Math.max(0, Math.min(cum[cum.length-1], km));
+  let lo = 0, hi = cum.length - 1;
+  while (hi - lo > 1){ const mid = (lo + hi) >> 1; if (cum[mid] <= km) lo = mid; else hi = mid; }
+  const f = cum[hi] > cum[lo] ? (km - cum[lo]) / (cum[hi] - cum[lo]) : 0;
+  const A = sh[lo], B = sh[hi];
+  const lat = A[0] + (B[0]-A[0]) * f, lon = A[1] + (B[1]-A[1]) * f;
+  const y = (B[1]-A[1]) * Math.cos(lat * Math.PI / 180), xx = B[0]-A[0];
+  return { ll: [lat, lon], brg: Math.atan2(y, xx) * 180 / Math.PI };
+}
+function kmSlice(k0, k1){     // track points between two distances
+  const cum = geoCum(), sh = TT.geo.shape, lo = Math.min(k0, k1), hi = Math.max(k0, k1);
+  const pts = [atKm(lo).ll];
+  cum.forEach((c, k) => { if (c > lo && c < hi) pts.push(sh[k]); });
+  pts.push(atKm(hi).ll);
+  return pts;
+}
+function trainKm(x){
+  const km = TT.geo.stationKm, p = stopTimes(x), n = p.length, i = trainPosition(p);
+  const K = k => km[x.t[4][k][0]];
+  const tm = s => (s.est || s.sched).getTime();
+  if (i < 0) return { km: K(0), moving: false };
+  if (i >= n - 1) return { km: K(n-1), moving: false };
+  let next = i + 1; while (next < n - 1 && p[next].skip) next++;
+  const t0 = tm(p[i]), t1 = tm(p[next]), frac = t1 > t0 ? Math.min(1, Math.max(0, (Date.now() - t0) / (t1 - t0))) : 0;
+  return { km: K(i) + frac * (K(next) - K(i)), moving: frac > 0 && frac < 1 };
+}
+async function attachMaps(){
+  const holders = [...document.querySelectorAll('.lmap')];
+  if (!holders.length) return;
+  if (!TT || !TT.geo || TT.demo && !TT.geo){
+    holders.forEach(h => h.innerHTML = `<div class="msg">The map needs the updated timetable builder. Upload the new build_timetable.py to GitHub and run “Update timetable” once.</div>`);
+    return;
+  }
+  try{ await ensureLeaflet(); }catch(e){ holders.forEach(h => h.innerHTML = `<div class="msg">${esc(e.message)}. Check your internet connection.</div>`); return; }
+  holders.forEach(h => {
+    const k = h.dataset.k, x = data && data.list.find(y => key(y) === k);
+    if (!x) return;
+    let c = mapCache.get(k);
+    if (!c){
+      const node = document.createElement('div'); node.className = 'lmapnode';
+      ['click', 'pointerdown', 'touchstart'].forEach(ev => node.addEventListener(ev, e => e.stopPropagation()));
+      h.appendChild(node);
+      const map = L.map(node, { zoomControl: true, attributionControl: true, zoomSnap: 0.25 });
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap contributors' }).addTo(map);
+      c = { node, map, layer: null, fitted: false }; mapCache.set(k, c);
+    } else h.appendChild(c.node);
+    c.map.invalidateSize();
+    drawTrip(c, x);
+  });
+}
+function drawTrip(c, x){
+  const km = TT.geo.stationKm, stops = x.t[4], p = stopTimes(x);
+  const K = k => km[stops[k][0]];
+  if (K(0) == null || K(stops.length - 1) == null) return;
+  if (c.layer) c.layer.remove();
+  const lg = L.layerGroup().addTo(c.map); c.layer = lg;
+  const start = K(0), end = K(stops.length - 1), up = end < start;
+  L.polyline(kmSlice(start, end), { color: '#6b6375', weight: 5, opacity: .75 }).addTo(lg);
+  L.polyline(kmSlice(K(x.i), K(x.j)), { color: '#a23bbf', weight: 7, opacity: .9 }).addTo(lg);
+  const T = x.cx ? null : trainKm(x);
+  if (T && Math.abs(T.km - start) > 0.01) L.polyline(kmSlice(start, T.km), { color: '#19b37a', weight: 5, opacity: .95 }).addTo(lg);
+  stops.forEach((s, k) => {
+    if (km[s[0]] == null) return;
+    const mine = k === x.i || k === x.j, ll = atKm(km[s[0]]).ll, passed = T && (up ? km[s[0]] >= T.km : km[s[0]] <= T.km);
+    const m = L.circleMarker(ll, { radius: mine ? 7 : 5, color: mine ? '#ffffff' : '#3a3442', weight: mine ? 3 : 2, fillColor: mine ? '#a23bbf' : passed ? '#19b37a' : '#ffffff', fillOpacity: 1 }).addTo(lg);
+    const t = p[k].skip ? 'not stopping' : fmt(p[k].est || p[k].sched);
+    m.bindTooltip(`${esc(p[k].name)} · ${t}`, { className: 'stn', direction: 'top', offset: [0, -6], permanent: mine });
+  });
+  if (T){
+    const pt = atKm(T.km), brg = pt.brg + (up ? 180 : 0);
+    const icon = L.divIcon({ className: '', iconSize: [30, 30], iconAnchor: [15, 15],
+      html: `<div class="trainpin${x.live ? '' : ' sched'}"><i></i><svg viewBox="-15 -15 30 30" style="transform:rotate(${brg.toFixed(0)}deg)"><path d="M0 -14 L6 -6 L0 -8 L-6 -6 Z" fill="${x.live ? '#3ddc97' : '#9a93a8'}" stroke="#0e0b14" stroke-width="1"/></svg><b></b></div>` });
+    L.marker(pt.ll, { icon, interactive: false, zIndexOffset: 1000 }).addTo(lg);
+  }
+  if (!c.fitted){ c.map.invalidateSize(); c.map.fitBounds(L.polyline(kmSlice(K(x.i), K(x.j))).getBounds().extend(T ? atKm(T.km).ll : atKm(K(x.i)).ll), { padding: [30, 30] }); c.fitted = true; }
+}
+
 /* ---------- refresh ---------- */
 async function refresh(full){
   if (loading) return;
@@ -646,7 +776,7 @@ async function refresh(full){
   data = compute(); lastUpdated = new Date();
   loading = false; $('refreshBtn').classList.remove('spin'); render();
 }
-function reset(){ pages = 0; openRuns.clear(); data = TT ? compute() : null; render(); if (st.mode === 'live' && !rtAt) refresh(); }
+function reset(){ pages = 0; openRuns.clear(); mapKeys.clear(); data = TT ? compute() : null; render(); if (st.mode === 'live' && !rtAt) refresh(); }
 
 setInterval(() => { if (st.mode === 'live' && document.visibilityState === 'visible') refresh(); }, LIVE_REFRESH);
 setInterval(() => { if (TT && !loading){ data = compute(); render(); } }, 15000);
