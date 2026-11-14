@@ -196,6 +196,15 @@
   .leaflet-container{font:12px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
   .leaflet-tooltip.stn{background:#1a1622;color:#f4f1f8;border:0;box-shadow:0 1px 4px rgba(0,0,0,.4);font-weight:600;padding:3px 7px}
   .leaflet-tooltip.stn:before{display:none}
+  .lmap{position:relative;isolation:isolate;z-index:0}
+  .fsbtn{position:absolute;top:10px;right:10px;z-index:1000;width:36px;height:36px;border-radius:10px;background:#fff;color:#1a1622;font-size:18px;font-weight:700;box-shadow:0 1px 5px rgba(0,0,0,.35)}
+  .lmap.fs{position:fixed;inset:0;z-index:2000;margin:0;border-radius:0;background:#1a1622;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  .lmap.fs .lmapnode{height:100%}
+  .lmap.fs .fsbtn{top:calc(env(safe-area-inset-top) + 12px);right:calc(env(safe-area-inset-right) + 12px)}
+  body.fsopen{overflow:hidden}
+  .earlier{display:block;width:100%;margin:2px 0 4px;padding:10px;border-radius:12px;color:var(--accent);font-weight:600;font-size:14px;background:transparent}
+  .more.top{border-top:0;border-bottom:1px solid var(--line)}
+  .row.gone .t,.row.gone .a{color:#b9b0c6} .row.gone .in{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -269,7 +278,9 @@ let TT = null, ttDemo = false, ttErr = null;        // timetable
 let RT = null, rtAt = null, rtErr = null;           // realtime: Map trip_id -> update
 let data = null, loading = false, pages = 0, lastUpdated = null;
 const openRuns = new Set();
-const mapKeys = new Set();     // trains shown on the real map instead of the line diagram   // trains whose track / stop list is open (several at once)
+const mapKeys = new Set();
+let earlier = 0;                // recent departures shown = earlier * 3
+let fsKey = null;               // map shown full screen     // trains shown on the real map instead of the line diagram   // trains whose track / stop list is open (several at once)
 const save = () => store.set('st2', st);
 const isDemo = () => demoPref || ttDemo;
 
@@ -445,7 +456,9 @@ function compute(){
   const all = journeys(st.from, st.to, live ? 1 + Math.floor(pages / 4) : 3 + pages*3);
   all.forEach(x => { applyRT(x); x.when = (live && x.est) || x.sched; });
   const list = all.filter(x => x.when.getTime() > now - 60000).sort((a,b) => a.when - b.when);
-  return { list: list.slice(0, want), more: live ? list.length > want : true };
+  const gone = all.filter(x => x.when.getTime() <= now - 60000).sort((a,b) => a.when - b.when);
+  const past = live && earlier ? gone.slice(-earlier * 3) : [];
+  return { list: list.slice(0, want), more: live ? list.length > want : true, past, morePast: gone.length > past.length };
 }
 
 /* ---------- render ---------- */
@@ -503,6 +516,14 @@ function render(){
     if (b.dataset.view === 'map') mapKeys.add(k); else mapKeys.delete(k);
     render();
   });
+  m.querySelectorAll('[data-fs]').forEach(b => b.onclick = e => {
+    e.stopPropagation();
+    fsKey = fsKey === b.dataset.fs ? null : b.dataset.fs;
+    document.body.classList.toggle('fsopen', !!fsKey);
+    render();
+  });
+  const eb = $('earlierBtn'); if (eb) eb.onclick = () => { earlier++; data = compute(); render(); };
+  const he = $('hideEarlier'); if (he) he.onclick = () => { earlier = 0; data = compute(); render(); };
   attachMaps();
   foot();
 }
@@ -521,10 +542,27 @@ function renderTT(){
 }
 function cdown(d){ const m = mins(d); if (m <= 0) return ['Now','']; if (m < 60) return [m,'min']; return [Math.floor(m/60)+'h', m%60 ? (m%60)+'m' : '']; }
 const key = x => x.id + '@' + x.day;
+function rowHTML(x){
+  const m = mins(x.when), late = x.est ? Math.round((x.est - x.sched)/60000) : 0, past = m < 0;
+  const ago = -m < 60 ? `${-m}<small>min ago</small>` : `${Math.floor(-m/60)}h ${-m%60}<small>ago</small>`;
+  return `<div class="row${x.cx ? ' cx':''}${past ? ' gone' : ''}"><button data-run="${esc(key(x))}">
+      <div class="t">${fmt(x.when)}${late >= 2 ? `<s>${fmt(x.sched)}</s>` : ''}</div>
+      <div><div class="a">Arr ${fmt(arrOf(x,true))} · ${durOf(x,true)} min</div><div class="b">${pill(x)}${coachTag(x)}${x.plat ? `<span>Plat ${esc(x.plat)}</span>` : ''}${x.cx ? '' : `<span class="tg">${openRuns.has(key(x)) ? 'Hide map ▴' : 'Show map ▾'}</span>`}</div></div>
+      <div class="in">${x.cx ? '—' : past ? ago : m === 0 ? 'Now' : m < 60 ? `${m}<small>min</small>` : `${Math.floor(m/60)}h ${m%60}<small>&nbsp;</small>`}</div>
+    </button>${openRuns.has(key(x)) && !x.cx ? `<div class="rtrk">${wherePill(x, true)}</div>` : ''}</div>`;
+}
+function recentHTML(){
+  if (!earlier) return data.morePast ? `<button class="earlier" id="earlierBtn">↑ Show recent departures</button>` : '';
+  let h = `<h2 style="margin-top:16px">Recent departures</h2><div class="list">`;
+  if (data.morePast) h += `<button class="more top" id="earlierBtn">↑ Show 3 earlier</button>`;
+  if (!data.past.length) h += `<div class="empty">No recent departures.</div>`;
+  data.past.forEach(x => { h += rowHTML(x); });
+  return h + `<button class="more" id="hideEarlier">Hide recent departures</button></div>`;
+}
 function renderLive(){
   const first = data.list.find(x => !x.cx) || data.list[0];
   const [n,u] = cdown(first.when);
-  let h = `<div class="hero" data-run="${esc(key(first))}">
+  let h = recentHTML() + `<div class="hero" data-run="${esc(key(first))}">
     <div class="lbl">Next train to ${esc(st.to)}</div>
     <div class="toprow">
       <div><div class="big${String(n).length > 2 ? ' wide' : ''}">${n}${u ? `<small>${u}</small>` : ''}</div>
@@ -542,14 +580,7 @@ function renderLive(){
   </div><h2>Following trains</h2><div class="list">`;
   const rest = data.list.filter(x => x !== first);
   if (!rest.length) h += `<div class="empty">No more trains found.</div>`;
-  rest.forEach(x => {
-    const m = mins(x.when), late = x.est ? Math.round((x.est - x.sched)/60000) : 0;
-    h += `<div class="row${x.cx ? ' cx':''}"><button data-run="${esc(key(x))}">
-      <div class="t">${fmt(x.when)}${late >= 2 ? `<s>${fmt(x.sched)}</s>` : ''}</div>
-      <div><div class="a">Arr ${fmt(arrOf(x,true))} · ${durOf(x,true)} min</div><div class="b">${pill(x)}${coachTag(x)}${x.plat ? `<span>Plat ${esc(x.plat)}</span>` : ''}${x.cx ? '' : `<span class="tg">${openRuns.has(key(x)) ? 'Hide map ▴' : 'Show map ▾'}</span>`}</div></div>
-      <div class="in">${x.cx ? '—' : m <= 0 ? 'Now' : m < 60 ? `${m}<small>min</small>` : `${Math.floor(m/60)}h ${m%60}<small>&nbsp;</small>`}</div>
-    </button>${openRuns.has(key(x)) && !x.cx ? `<div class="rtrk">${wherePill(x, true)}</div>` : ''}</div>`;
-  });
+  rest.forEach(x => { h += rowHTML(x); });
   if (data.more) h += `<button class="more" id="moreBtn">Show 3 more departures</button>`;
   return h + '</div>';
 }
@@ -618,7 +649,8 @@ function wherePill(x, inRow){
   const geo = TT && TT.geo, km = geo && geo.stationKm;
   const dist = km && km[x.t[4][x.i][0]] != null && km[x.t[4][x.j][0]] != null ? Math.abs(km[x.t[4][x.j][0]] - km[x.t[4][x.i][0]]) : null;
   const sw = '';
-  return sw + (onMap ? `<div class="lmap" data-k="${esc(k)}"></div>` : g)
+  const fs = fsKey === k;
+  return sw + (onMap ? `<div class="lmap${fs ? ' fs' : ''}" data-k="${esc(k)}"><button class="fsbtn" data-fs="${esc(k)}" aria-label="${fs ? 'Close full screen' : 'Full screen map'}">${fs ? '✕' : '⤢'}</button></div>` : g)
     + `<div class="where">${txt}${dist != null ? ` · ${dist.toFixed(1)} km trip` : ''}${inRow || openRuns.has(k) ? '' : ' · tap for all stops'}</div>`;
 }
 // place station names on the line map without overlaps: your From/To always shown (second row if needed)
@@ -722,7 +754,7 @@ async function attachMaps(){
   }
   try{ await ensureLeaflet(); }catch(e){ holders.forEach(h => h.innerHTML = `<div class="msg">${esc(e.message)}. Check your internet connection.</div>`); return; }
   holders.forEach(h => {
-    const k = h.dataset.k, x = data && data.list.find(y => key(y) === k);
+    const k = h.dataset.k, x = data && [...data.list, ...(data.past || [])].find(y => key(y) === k);
     if (!x) return;
     let c = mapCache.get(k);
     if (!c){
@@ -733,6 +765,8 @@ async function attachMaps(){
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap contributors' }).addTo(map);
       c = { node, map, layer: null, fitted: false }; mapCache.set(k, c);
     } else h.appendChild(c.node);
+    const fsNow = h.classList.contains('fs');
+    if (c.fs !== fsNow){ c.fs = fsNow; c.fitted = false; setTimeout(() => { c.map.invalidateSize(); drawTrip(c, x); }, 60); }
     c.map.invalidateSize();
     drawTrip(c, x);
   });
@@ -764,6 +798,8 @@ function drawTrip(c, x){
   if (!c.fitted){ c.map.invalidateSize(); c.map.fitBounds(L.polyline(kmSlice(K(x.i), K(x.j))).getBounds().extend(T ? atKm(T.km).ll : atKm(K(x.i)).ll), { padding: [30, 30] }); c.fitted = true; }
 }
 
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && fsKey){ fsKey = null; document.body.classList.remove('fsopen'); render(); } });
+
 /* ---------- refresh ---------- */
 async function refresh(full){
   if (loading) return;
@@ -776,7 +812,7 @@ async function refresh(full){
   data = compute(); lastUpdated = new Date();
   loading = false; $('refreshBtn').classList.remove('spin'); render();
 }
-function reset(){ pages = 0; openRuns.clear(); mapKeys.clear(); data = TT ? compute() : null; render(); if (st.mode === 'live' && !rtAt) refresh(); }
+function reset(){ pages = 0; earlier = 0; fsKey = null; document.body.classList.remove('fsopen'); openRuns.clear(); mapKeys.clear(); data = TT ? compute() : null; render(); if (st.mode === 'live' && !rtAt) refresh(); }
 
 setInterval(() => { if (st.mode === 'live' && document.visibilityState === 'visible') refresh(); }, LIVE_REFRESH);
 setInterval(() => { if (TT && !loading){ data = compute(); render(); } }, 15000);
