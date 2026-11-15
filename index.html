@@ -166,6 +166,10 @@
   .snake .s-dot.past{fill:#3ddc97;stroke:#3ddc97}
   .snake .s-dot.mine{fill:#c06ad8;stroke:#fff}
   .snake .s-dot.skip{opacity:.35;stroke-dasharray:2 2}
+  .snake .s-run{fill:none;stroke:rgba(255,255,255,.3);stroke-width:4;stroke-linecap:round}
+  .snake .s-dot.off{fill:#1c1724;stroke:rgba(255,255,255,.2)}
+  .snake .s-x{stroke:#e0606a;stroke-width:1.8;stroke-linecap:round;fill:none}
+  .snake .s-nm.off{fill:#6f6680;text-decoration:line-through}
   .snake .s-nm{font-size:10.5px;fill:#d8c4e2;text-anchor:middle}
   .snake .s-nm.past{fill:#9a8fa8} .snake .s-nm.mine{fill:#fff;font-weight:700}
   .snake .s-tm{font-size:9.5px;fill:#a99bb5;font-weight:400}
@@ -640,23 +644,17 @@ function wherePill(x, inRow){
   if (x.cx) return '';
   const p = stopTimes(x), n = p.length, i = trainPosition(p);
   const tm = s => (s.est || s.sched).getTime();
-  // snake layout: rows of 4 stations, left→right then right→left, joined by U-turns
+  // snake layout: every station of the line, 4 per row, left→right then right→left, joined by U-turns.
+  // The Geelong / Waurn Ponds end is always at the top and Southern Cross at the bottom; only the arrow
+  // changes direction. Stations this train doesn't serve are crossed out.
+  const kmL = TT.geo && TT.geo.stationKm, N = TT.stations.length;
+  const order = TT.stations.map((_, id) => id).sort((a, b) => kmL && kmL[a] != null && kmL[b] != null ? kmL[b] - kmL[a] : b - a);
+  const slotOf = new Map(order.map((id, sl) => [id, sl]));
+  const S = k => slotOf.get(x.t[4][k][0]);          // slot of the train's k-th stop
   const PER = 4, W = 320, X0 = 44, X1 = 276, RH = 80, Y0 = 26, R = RH / 2;
   const dx = (X1 - X0) / (PER - 1);
-  // Geelong end always at the top, Southern Cross always at the bottom: trains running
-  // away from Southern Cross are drawn in reverse, so only the arrow changes direction
-  const kmL = TT && TT.geo && TT.geo.stationKm, sid = k => x.t[4][k][0];
-  const outbound = kmL && kmL[sid(0)] != null && kmL[sid(n - 1)] != null ? kmL[sid(0)] < kmL[sid(n - 1)] : sid(0) < sid(n - 1);
-  const rev = outbound && n > 1;
   const ptS = k => { const r = Math.floor(k / PER), c = k % PER; return { x: r % 2 ? X1 - c * dx : X0 + c * dx, y: Y0 + r * RH, r }; };
-  const pt = k => ptS(rev ? n - 1 - k : k);
-  // point + heading at fraction t along the segment from station k to k+1 (in travel order)
-  function at(k, t){
-    if (!rev) return atS(k, t);
-    const P = atS(n - 2 - k, 1 - t); return { x: P.x, y: P.y, h: P.h + 180 };
-  }
-  function seg(k, t0, t1){ return rev ? segS(n - 2 - k, 1 - t1, 1 - t0) : segS(k, t0, t1); }
-  // the same, in drawing order (slot k to k+1, top-left first)
+  // point + heading at fraction t along the segment from slot k to k+1
   function atS(k, t){
     const A = ptS(k), B = ptS(k + 1);
     if (A.r === B.r) return { x: A.x + (B.x - A.x) * t, y: A.y, h: B.x >= A.x ? 0 : 180 };
@@ -670,34 +668,46 @@ function wherePill(x, inRow){
     const sweep = ptS(k).r % 2 === 0 ? 1 : 0;
     return `M${A.x.toFixed(1)} ${A.y.toFixed(1)}A${R} ${R} 0 0 ${sweep} ${B.x.toFixed(1)} ${B.y.toFixed(1)}`;
   }
-  const run = (k0, f0, k1, f1) => { let d = ''; for (let k = k0; k <= k1 && k < n - 1; k++) d += seg(k, k === k0 ? f0 : 0, k === k1 ? f1 : 1); return d; };
+  // a continuous position u (in slots) and the path between two positions
+  const atU = u => { u = Math.max(0, Math.min(N - 1, u)); const k = Math.min(N - 2, Math.floor(u)); return atS(k, u - k); };
+  const runU = (u0, u1) => {
+    if (u0 > u1) [u0, u1] = [u1, u0];
+    let d = '';
+    for (let k = Math.floor(u0); k < u1 && k < N - 1; k++){ const a = Math.max(0, u0 - k), b = Math.min(1, u1 - k); if (b > a) d += segS(k, a, b); }
+    return d;
+  };
   // where the train is
-  let tk = 0, tf = 0, next = -1, moving = false;
-  if (i < 0){ tk = 0; tf = 0; }
-  else if (i >= n - 1){ tk = n - 2; tf = 1; }
+  let u, next = -1, moving = false;
+  if (i < 0) u = S(0);
+  else if (i >= n - 1) u = S(n - 1);
   else {
     next = i + 1; while (next < n - 1 && p[next].skip) next++;
     const t0 = tm(p[i]), t1 = tm(p[next]), now = Date.now();
     const frac = t1 > t0 ? Math.min(1, Math.max(0, (now - t0) / (t1 - t0))) : 0;
-    const span = (next - i) * frac; tk = Math.min(n - 2, i + Math.floor(span)); tf = span - Math.floor(span);
-    if (i + Math.floor(span) >= n - 1){ tk = n - 2; tf = 1; }
+    u = S(i) + (S(next) - S(i)) * frac;
     moving = frac > 0 && frac < 1;
   }
-  const rows = Math.ceil(n / PER), H = Y0 + (rows - 1) * RH + 46;
+  const dir = n > 1 && S(n - 1) < S(0) ? -1 : 1;     // -1: heading up the screen (away from Southern Cross)
+  const rows = Math.ceil(N / PER), H = Y0 + (rows - 1) * RH + 46;
   let g = `<svg class="snake" viewBox="0 0 ${W} ${H}" role="img" aria-label="Train position on the line">`;
-  g += `<path d="${run(0, 0, n - 2, 1)}" class="s-base"/>`;
-  if (x.j > x.i) g += `<path d="${run(x.i, 0, x.j - 1, 1)}" class="s-trip"/>`;
-  if (i >= 0) g += `<path d="${run(0, 0, tk, tf)}" class="s-done"/>`;
-  p.forEach((s, k) => {
-    const P = pt(k), mine = k === x.i || k === x.j, past = k <= i && !s.skip;
-    if (s.plat && !s.skip) g += `<text x="${P.x}" y="${P.y - 11}" class="s-pl${mine ? ' mine' : ''}">P${esc(s.plat)}</text>`;
-    g += `<circle cx="${P.x}" cy="${P.y}" r="${mine ? 6.5 : 4.5}" class="s-dot${mine ? ' mine' : ''}${past ? ' past' : ''}${s.skip ? ' skip' : ''}"/>`;
-    const words = s.name.split(' '), two = s.name.length > 10 && words.length > 1;
-    const l1 = two ? words.slice(0, Math.ceil(words.length / 2)).join(' ') : s.name, l2 = two ? words.slice(Math.ceil(words.length / 2)).join(' ') : '';
-    g += `<text x="${P.x}" y="${P.y + 20}" class="s-nm${mine ? ' mine' : ''}${past ? ' past' : ''}">${esc(l1)}${l2 ? `<tspan x="${P.x}" dy="11">${esc(l2)}</tspan>` : ''}<tspan x="${P.x}" dy="12" class="s-tm">${s.skip ? 'not stopping' : fmt(new Date(tm(s)))}</tspan></text>`;
+  g += `<path d="${runU(0, N - 1)}" class="s-base"/>`;
+  if (n > 1) g += `<path d="${runU(S(0), S(n - 1))}" class="s-run"/>`;
+  if (x.j > x.i) g += `<path d="${runU(S(x.i), S(x.j))}" class="s-trip"/>`;
+  if (i >= 0) g += `<path d="${runU(S(0), u)}" class="s-done"/>`;
+  const stopAt = new Map(); x.t[4].forEach((s, k) => stopAt.set(s[0], k));
+  order.forEach((id, sl) => {
+    const P = ptS(sl), k = stopAt.has(id) ? stopAt.get(id) : -1, s = k >= 0 ? p[k] : null;
+    const off = !s || s.skip, mine = k >= 0 && (k === x.i || k === x.j), past = !off && k <= i;
+    if (s && s.plat && !s.skip) g += `<text x="${P.x}" y="${P.y - 11}" class="s-pl${mine ? ' mine' : ''}">P${esc(s.plat)}</text>`;
+    g += `<circle cx="${P.x}" cy="${P.y}" r="${mine ? 6.5 : 4.5}" class="s-dot${mine ? ' mine' : ''}${past ? ' past' : ''}${off ? ' off' : ''}"/>`;
+    if (off) g += `<path d="M${P.x - 4.5} ${P.y - 4.5}l9 9m0 -9l-9 9" class="s-x"/>`;
+    const name = TT.stations[id], words = name.split(' '), two = name.length > 10 && words.length > 1;
+    const l1 = two ? words.slice(0, Math.ceil(words.length / 2)).join(' ') : name, l2 = two ? words.slice(Math.ceil(words.length / 2)).join(' ') : '';
+    const when = !s ? '' : s.skip ? 'not stopping' : fmt(new Date(tm(s)));
+    g += `<text x="${P.x}" y="${P.y + 20}" class="s-nm${mine ? ' mine' : ''}${past ? ' past' : ''}${off ? ' off' : ''}">${esc(l1)}${l2 ? `<tspan x="${P.x}" dy="11">${esc(l2)}</tspan>` : ''}${when ? `<tspan x="${P.x}" dy="12" class="s-tm">${when}</tspan>` : ''}</text>`;
   });
-  const T = at(tk, tf), flip = Math.cos(T.h * Math.PI / 180) < -0.01;
-  const tr = flip ? `translate(${T.x.toFixed(1)} ${T.y.toFixed(1)}) rotate(${(T.h - 180).toFixed(1)}) scale(-1 1)` : `translate(${T.x.toFixed(1)} ${T.y.toFixed(1)}) rotate(${T.h.toFixed(1)})`;
+  const T = atU(u), hd = T.h + (dir < 0 ? 180 : 0), flip = Math.cos(hd * Math.PI / 180) < -0.01;
+  const tr = flip ? `translate(${T.x.toFixed(1)} ${T.y.toFixed(1)}) rotate(${(hd - 180).toFixed(1)}) scale(-1 1)` : `translate(${T.x.toFixed(1)} ${T.y.toFixed(1)}) rotate(${hd.toFixed(1)})`;
   g += `<g transform="${tr}"><g class="s-train${x.live ? '' : ' sched'}${moving ? ' moving' : ''}">
     <circle r="9" class="ph"/>
     <path d="M6 -8 L21 0 L6 8 L9.5 0 Z" class="pa"/>
