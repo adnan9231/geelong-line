@@ -288,6 +288,7 @@ let st = store.get('st2', { mode:'live', from: HOME, to: CITY });
 store.set('alarm', null);
 st.mode = 'live';   // the app is always live (no Live/Timetable buttons)
 let saved = store.get('saved', DEFAULT_TRIPS);
+let hiddenPair = null;   // a just-deleted trip that is still being viewed: don't offer it back as ☆
 // one-time switch: if this phone still has the old untouched defaults (Tarneit), move them to West Tarneit
 if (!store.get('defaultsV2', false)){
   const oldDefaults = JSON.stringify([{ from:'Tarneit', to:'Southern Cross' }, { from:'Southern Cross', to:'Tarneit' }]);
@@ -512,7 +513,7 @@ function renderControls(){
   const cur = tripKey(st), pk = (x, y) => [x.toLowerCase(), y.toLowerCase()].sort().join('|');
   const pairs = [];
   saved.forEach(t => { const k = pk(t.from, t.to); if (!pairs.some(p => p.k === k)) pairs.push({ k, a: t.from, b: t.to, saved: true }); });
-  if (!pairs.some(p => p.k === pk(st.from, st.to)) && !same(st.from, st.to)) pairs.push({ k: pk(st.from, st.to), a: st.from, b: st.to, saved: false });
+  if (!pairs.some(p => p.k === pk(st.from, st.to)) && !same(st.from, st.to) && pk(st.from, st.to) !== hiddenPair) pairs.push({ k: pk(st.from, st.to), a: st.from, b: st.to, saved: false });
   const dirBtn = (f, t) => `<button class="pd${tripKey({ from: f, to: t }) === cur ? ' on' : ''}" data-f="${esc(f)}" data-t="${esc(t)}"><small>from ${esc(f)}</small>to ${esc(t)}</button>`;
   let h = pairs.map(p => `<div class="pair">${dirBtn(p.a, p.b)}${dirBtn(p.b, p.a)}${p.saved
       ? `<button class="px" data-delpair="${esc(p.k)}" aria-label="Remove trip">×</button>`
@@ -521,7 +522,14 @@ function renderControls(){
   $('chips').innerHTML = h;
   $('chips').querySelectorAll('[data-f]').forEach(b => b.onclick = () => { st.from = b.dataset.f; st.to = b.dataset.t; save(); reset(); });
   $('chips').querySelectorAll('[data-delpair]').forEach(b => b.onclick = () => {
-    saved = saved.filter(t => pk(t.from, t.to) !== b.dataset.delpair); store.set('saved', saved); renderControls();
+    const k = b.dataset.delpair;
+    saved = saved.filter(t => pk(t.from, t.to) !== k); store.set('saved', saved);
+    if (pk(st.from, st.to) === k){
+      // deleted the trip being viewed: move to another saved trip, or just hide this row
+      if (saved.length){ st.from = saved[0].from; st.to = saved[0].to; save(); reset(); return; }
+      hiddenPair = k;
+    }
+    renderControls();
   });
   $('chips').querySelectorAll('[data-savepair]').forEach(b => b.onclick = () => { saved.push({ from: st.from, to: st.to }); store.set('saved', saved); renderControls(); });
   $('addTrip').onclick = () => openTrip();
