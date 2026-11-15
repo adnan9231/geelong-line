@@ -643,19 +643,31 @@ function wherePill(x, inRow){
   // snake layout: rows of 4 stations, left→right then right→left, joined by U-turns
   const PER = 4, W = 320, X0 = 44, X1 = 276, RH = 80, Y0 = 26, R = RH / 2;
   const dx = (X1 - X0) / (PER - 1);
-  const pt = k => { const r = Math.floor(k / PER), c = k % PER; return { x: r % 2 ? X1 - c * dx : X0 + c * dx, y: Y0 + r * RH, r }; };
-  // point + heading at fraction t along the segment from station k to k+1
+  // Geelong end always at the top, Southern Cross always at the bottom: trains running
+  // away from Southern Cross are drawn in reverse, so only the arrow changes direction
+  const kmL = TT && TT.geo && TT.geo.stationKm, sid = k => x.t[4][k][0];
+  const outbound = kmL && kmL[sid(0)] != null && kmL[sid(n - 1)] != null ? kmL[sid(0)] < kmL[sid(n - 1)] : sid(0) < sid(n - 1);
+  const rev = outbound && n > 1;
+  const ptS = k => { const r = Math.floor(k / PER), c = k % PER; return { x: r % 2 ? X1 - c * dx : X0 + c * dx, y: Y0 + r * RH, r }; };
+  const pt = k => ptS(rev ? n - 1 - k : k);
+  // point + heading at fraction t along the segment from station k to k+1 (in travel order)
   function at(k, t){
-    const A = pt(k), B = pt(k + 1);
+    if (!rev) return atS(k, t);
+    const P = atS(n - 2 - k, 1 - t); return { x: P.x, y: P.y, h: P.h + 180 };
+  }
+  function seg(k, t0, t1){ return rev ? segS(n - 2 - k, 1 - t1, 1 - t0) : segS(k, t0, t1); }
+  // the same, in drawing order (slot k to k+1, top-left first)
+  function atS(k, t){
+    const A = ptS(k), B = ptS(k + 1);
     if (A.r === B.r) return { x: A.x + (B.x - A.x) * t, y: A.y, h: B.x >= A.x ? 0 : 180 };
     const cx = A.x, cy = A.y + R, right = A.r % 2 === 0;
     const ang = (right ? -90 + 180 * t : -90 - 180 * t) * Math.PI / 180;
     return { x: cx + R * Math.cos(ang), y: cy + R * Math.sin(ang), h: (right ? ang * 180 / Math.PI + 90 : ang * 180 / Math.PI - 90) };
   }
-  function seg(k, t0, t1){
-    const A = at(k, t0), B = at(k, t1), same = pt(k).r === pt(k + 1).r;
+  function segS(k, t0, t1){
+    const A = atS(k, t0), B = atS(k, t1), same = ptS(k).r === ptS(k + 1).r;
     if (same) return `M${A.x.toFixed(1)} ${A.y}L${B.x.toFixed(1)} ${B.y}`;
-    const sweep = pt(k).r % 2 === 0 ? 1 : 0;
+    const sweep = ptS(k).r % 2 === 0 ? 1 : 0;
     return `M${A.x.toFixed(1)} ${A.y.toFixed(1)}A${R} ${R} 0 0 ${sweep} ${B.x.toFixed(1)} ${B.y.toFixed(1)}`;
   }
   const run = (k0, f0, k1, f1) => { let d = ''; for (let k = k0; k <= k1 && k < n - 1; k++) d += seg(k, k === k0 ? f0 : 0, k === k1 ? f1 : 1); return d; };
