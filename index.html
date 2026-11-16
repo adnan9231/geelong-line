@@ -219,8 +219,10 @@
   .chip .x{font-size:15px}
   .pair{display:flex;gap:5px;width:100%}
   .pd{flex:1;min-width:0;text-align:left;padding:6px 10px;border-radius:10px;background:var(--card);color:#d8d2e2;font-size:14px;font-weight:600;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pd b{display:block;font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis}
+  .pd b i{font-style:normal;font-size:11px;font-weight:500;color:var(--muted)}
   .pd small{display:block;font-size:11px;font-weight:500;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
-  .pd.on{background:var(--accent2);color:#fff} .pd.on small{color:#ecd3f2}
+  .pd.on{background:var(--accent2);color:#fff} .pd.on small,.pd.on b i{color:#ecd3f2}
   .px{flex:none;width:34px;border-radius:10px;background:var(--card);color:var(--muted);font-size:16px}
   .px.star{color:var(--accent)}
   .toprow > div:first-child{min-width:0;max-width:52%;flex:none}
@@ -518,7 +520,7 @@ function renderControls(){
   const pairs = [];
   saved.forEach(t => { const k = pk(t.from, t.to); if (!pairs.some(p => p.k === k)) pairs.push({ k, a: t.from, b: t.to, saved: true }); });
   if (!pairs.some(p => p.k === pk(st.from, st.to)) && !same(st.from, st.to) && pk(st.from, st.to) !== hiddenPair) pairs.push({ k: pk(st.from, st.to), a: st.from, b: st.to, saved: false });
-  const dirBtn = (f, t) => `<button class="pd${tripKey({ from: f, to: t }) === cur ? ' on' : ''}" data-f="${esc(f)}" data-t="${esc(t)}"><small>from ${esc(f)}</small>to ${esc(t)}</button>`;
+  const dirBtn = (f, t) => `<button class="pd${tripKey({ from: f, to: t }) === cur ? ' on' : ''}" data-f="${esc(f)}" data-t="${esc(t)}"><b><i>from</i> ${esc(f)}</b><small>to ${esc(t)}</small></button>`;
   let h = pairs.map(p => `<div class="pair">${dirBtn(p.a, p.b)}${dirBtn(p.b, p.a)}${p.saved
       ? `<button class="px" data-delpair="${esc(p.k)}" aria-label="Remove trip">×</button>`
       : `<button class="px star" data-savepair="${esc(p.k)}" aria-label="Save trip">☆</button>`}</div>`).join('');
