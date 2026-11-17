@@ -613,7 +613,7 @@ function recentHTML(){
 function renderLive(){
   const first = data.list.find(x => !x.cx) || data.list[0];
   const [n,u] = cdown(first.when);
-  let h = recentHTML() + `<div class="hero" data-run="${esc(key(first))}">
+  let h = recentHTML() + `<div class="hero">
     <div class="lbl">Next train to ${esc(st.to)}</div>
     <div class="toprow">
       <div><div class="big${String(n).length > 2 ? ' wide' : ''}">${n}${u ? `<small>${u}</small>` : ''}</div>
@@ -626,7 +626,6 @@ function renderLive(){
       </div>
     </div>
     ${wherePill(first)}
-    ${openRuns.has(key(first)) ? patternHTML(first) : ''}
   </div><h2>Following trains</h2><div class="list">`;
   const rest = data.list.filter(x => x !== first);
   if (!rest.length) h += `<div class="empty">No more trains found.</div>`;
@@ -725,7 +724,7 @@ function wherePill(x, inRow){
   const sw = inRow ? viewSwitch(false) : '';   // the next train has its switch beside the countdown
   const fs = fsKey === k;
   return sw + (onMap ? `<div class="lmap${fs ? ' fs' : ''}" data-k="${esc(k)}"><button class="fsbtn" data-fs="${esc(k)}" aria-label="${fs ? 'Close full screen' : 'Full screen map'}">${fs ? '✕' : '⤢'}</button></div>` : g)
-    + `<div class="where">${txt}${dist != null ? ` · ${dist.toFixed(1)} km trip` : ''}${inRow || openRuns.has(k) ? '' : ' · tap for all stops'}</div>`;
+    + `<div class="where">${txt}${dist != null ? ` · ${dist.toFixed(1)} km trip` : ''}</div>`;
 }
 // place station names on the line map without overlaps: your From/To always shown (second row if needed)
 function layoutTracks(){
