@@ -104,36 +104,6 @@
   .rtrk .where{color:var(--muted)}
   .row.cx .t,.row.cx .a{text-decoration:line-through;color:var(--muted)}
 
-
-  /* collapsed train cards */
-  .cards{display:flex;flex-direction:column;gap:10px}
-  .tc{background:var(--card);border-radius:20px;overflow:hidden}
-  .tch{display:grid;grid-template-columns:48px 1fr auto;grid-template-areas:"ic hd cd" "bt bt bt";gap:12px;align-items:center;width:100%;padding:16px 26px 16px 14px;text-align:left;position:relative}
-  .tch .bt{grid-area:bt;display:flex;gap:10px;min-width:0}
-  .tch .ic{grid-area:ic;align-self:start;width:48px;height:48px;border-radius:50%;background:#fff;color:#3c4049;display:grid;place-items:center}
-  .tch .ic svg{width:28px;height:28px}
-  .tch .hd{grid-area:hd;min-width:0;display:flex;flex-direction:column;gap:2px}
-  .tch .tw{font-size:18px;font-weight:700;line-height:1.2}
-  .tch .sp{font-size:15px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .tch .st{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
-  .tch .cd{grid-area:cd;text-align:center;line-height:1;min-width:64px;align-self:start}
-  .tch .cd b{display:block;font-size:40px;font-weight:750;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-  .tch .cd small{display:block;font-size:17px;font-weight:650;margin-top:4px}
-  .tch .chev{position:absolute;right:9px;top:50%;margin-top:-14px;color:var(--muted);font-size:26px;line-height:1;transition:transform .2s}
-  .tc.open .chev{transform:rotate(90deg)}
-  .tch .da{flex:1;min-width:0;display:grid;grid-template-columns:1fr 1fr;background:#fff;color:#111;border-radius:12px;border:1.5px solid #111;padding:8px 0}
-  .tch .da > span{padding:0 10px;display:flex;flex-direction:column;min-width:0}
-  .tch .da > span + span{border-left:2px solid #111}
-  .tch .da small{font-size:13px} .tch .da b{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.15;white-space:nowrap}
-  .tch .da s{font-size:11px;color:#777} .tch .da i{font-style:normal;font-size:13px;font-weight:600;margin-left:1px}
-  .tch .pf{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#7b3f98;border:2px solid #fff;border-radius:12px;padding:6px 10px;min-width:64px}
-  .tch .pf small{font-size:12px;color:#f1e4f7} .tch .pf b{font-size:24px;font-weight:750;line-height:1.1}
-  .tch .pf.none{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18)} .tch .pf.none small,.tch .pf.none b{color:var(--muted)}
-  .tc.cx .tw,.tc.cx .da b{text-decoration:line-through;opacity:.6}
-  .tc.gone{opacity:.7}
-  .tc .rtrk{padding:0 14px 16px}
-  .more.card{border-top:0;background:var(--card);border-radius:16px}
-  @media (max-width:380px){ .tch{grid-template-columns:40px 1fr auto;gap:10px} .tch .ic{width:40px;height:40px} .tch .ic svg{width:24px;height:24px} .tch .da b,.tch .pf b{font-size:21px} .tch .cd b{font-size:34px} .tch .tw{font-size:17px} }
   /* stopping pattern */
   .pat{padding:4px 16px 14px 22px}
   .ps{display:grid;grid-template-columns:18px 1fr auto;gap:10px;align-items:center;position:relative;padding:5px 0;font-size:14px}
@@ -623,53 +593,45 @@ function renderTT(){
 }
 function cdown(d){ const m = mins(d); if (m <= 0) return ['Now','']; if (m < 60) return [m,'min']; return [Math.floor(m/60)+'h', m%60 ? (m%60)+'m' : '']; }
 const key = x => x.id + '@' + x.day;
-const TRAIN_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3" width="12" height="13" rx="3" fill="currentColor"/><rect x="8.2" y="5.4" width="7.6" height="4.4" rx="1" fill="#fff"/><circle cx="9" cy="13" r="1" fill="#fff"/><circle cx="15" cy="13" r="1" fill="#fff"/><path d="M9 17l-3 4M15 17l3 4M4.5 19h15M5.5 21h13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>';
-// "Stops all stations" / "Express · skips …" between your two stations
-function stoppingText(x){
-  const a = x.t[4][x.i][0], b = x.t[4][x.j][0], lo = Math.min(a, b), hi = Math.max(a, b);
-  const calls = new Set(x.t[4].filter((s, k) => !(x.stopsRT && x.stopsRT.skip[k])).map(s => s[0]));
-  const skipped = [];
-  for (let id = lo + 1; id < hi; id++) if (!calls.has(id)) skipped.push(TT.stations[id]);
-  if (hi - lo <= 1) return 'Direct';
-  if (!skipped.length) return 'Stops all stations';
-  if (skipped.length === hi - lo - 1) return 'Express · no stops between';
-  return 'Express · skips ' + (skipped.length <= 2 ? skipped.join(', ') : skipped.length + ' stations');
-}
-const tHTML = d => fmt(d).replace(/\s?(am|pm)$/i, '<i>$1</i>');
 function rowHTML(x){
-  const m = mins(x.when), late = x.est ? Math.round((x.est - x.sched)/60000) : 0, past = m < 0, k = key(x), open = openRuns.has(k) && !x.cx;
-  const cd = x.cx ? `<b>—</b>`
-    : past ? (-m < 60 ? `<b>${-m}</b><small>min ago</small>` : `<b>${Math.floor(-m/60)}h</b><small>${-m%60}m ago</small>`)
-    : m <= 0 ? `<b>Now</b>`
-    : m < 60 ? `<b>${m}</b><small>${m === 1 ? 'min' : 'mins'}</small>`
-    : `<b>${Math.floor(m/60)}h</b><small>${m%60 ? (m%60) + ' mins' : '&nbsp;'}</small>`;
-  return `<div class="tc${x.cx ? ' cx' : ''}${past ? ' gone' : ''}${open ? ' open' : ''}">
-    <button class="tch" data-run="${esc(k)}">
-      <span class="ic">${TRAIN_ICON}</span>
-      <span class="hd"><span class="tw">Towards ${esc(x.head || st.to)}</span>
-        <span class="sp">${esc(stoppingText(x))}</span>
-        <span class="st">${pill(x)}${coachTag(x)}</span></span>
-      <span class="cd">${cd}</span>
-      <span class="chev">›</span>
-      <span class="bt"><span class="da"><span><small>Departs</small><b>${tHTML(x.when)}</b>${late >= 2 ? `<s>was ${fmt(x.sched)}</s>` : ''}</span><span><small>Arrives</small><b>${tHTML(arrOf(x,true))}</b></span></span>
-      <span class="pf${x.plat ? '' : ' none'}"><small>Platform</small><b>${x.plat ? esc(x.plat) : '–'}</b></span></span>
-    </button>${open ? `<div class="rtrk">${wherePill(x, true)}</div>` : ''}</div>`;
+  const m = mins(x.when), late = x.est ? Math.round((x.est - x.sched)/60000) : 0, past = m < 0;
+  const ago = -m < 60 ? `${-m}<small>min ago</small>` : `${Math.floor(-m/60)}h ${-m%60}<small>ago</small>`;
+  return `<div class="row${x.cx ? ' cx':''}${past ? ' gone' : ''}"><button data-run="${esc(key(x))}">
+      <div class="t">${fmt(x.when)}${late >= 2 ? `<s>${fmt(x.sched)}</s>` : ''}</div>
+      <div><div class="a">Arr ${fmt(arrOf(x,true))} · ${durOf(x,true)} min</div><div class="b">${pill(x)}${coachTag(x)}${x.plat ? `<span>Plat ${esc(x.plat)}</span>` : ''}${x.cx ? '' : `<span class="tg">${openRuns.has(key(x)) ? (viewPref === 'map' ? 'Hide map ▴' : 'Hide track ▴') : (viewPref === 'map' ? 'Show map ▾' : 'Show track ▾')}</span>`}</div></div>
+      <div class="in">${x.cx ? '—' : past ? ago : m === 0 ? 'Now' : m < 60 ? `${m}<small>min</small>` : `${Math.floor(m/60)}h ${m%60}<small>&nbsp;</small>`}</div>
+    </button>${openRuns.has(key(x)) && !x.cx ? `<div class="rtrk">${wherePill(x, true)}</div>` : ''}</div>`;
 }
 function recentHTML(){
   if (!earlier) return data.morePast ? `<button class="earlier" id="earlierBtn">↑ Show recent departures</button>` : '';
-  let h = `<h2 style="margin-top:16px">Recent departures</h2><div class="cards">`;
-  if (data.morePast) h += `<button class="more card" id="earlierBtn">↑ Show 3 earlier</button>`;
-  if (!data.past.length) h += `<div class="list"><div class="empty">No recent departures.</div></div>`;
+  let h = `<h2 style="margin-top:16px">Recent departures</h2><div class="list">`;
+  if (data.morePast) h += `<button class="more top" id="earlierBtn">↑ Show 3 earlier</button>`;
+  if (!data.past.length) h += `<div class="empty">No recent departures.</div>`;
   data.past.forEach(x => { h += rowHTML(x); });
-  return h + `<button class="more card" id="hideEarlier">Hide recent departures</button></div>`;
+  return h + `<button class="more" id="hideEarlier">Hide recent departures</button></div>`;
 }
 function renderLive(){
   const first = data.list.find(x => !x.cx) || data.list[0];
-  let h = recentHTML() + `<h2 style="margin-top:16px">Next train to ${esc(st.to)}</h2><div class="cards">${rowHTML(first)}</div><h2>Following trains</h2><div class="cards">`;
+  const [n,u] = cdown(first.when);
+  let h = recentHTML() + `<div class="hero" data-run="${esc(key(first))}">
+    <div class="lbl">Next train to ${esc(st.to)}</div>
+    <div class="toprow">
+      <div><div class="big${String(n).length > 2 ? ' wide' : ''}">${n}${u ? `<small>${u}</small>` : ''}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${pill(first)}${coachTag(first)}</div></div>
+      <div class="meta2">
+        <span>Departs <b>${fmt(first.when)}</b> ${first.plat ? `<i class="ptag">Plat ${esc(first.plat)}</i>` : `<i class="ptag none">Plat –</i>`}</span>${first.est && Math.abs(first.est-first.sched) >= 120000 ? `<span style="opacity:.6;font-size:12px">was <s>${fmt(first.sched)}</s></span>` : ''}
+        <span>Arrives <b>${fmt(arrOf(first,true))}</b></span>
+        <span>${durOf(first,true)} min</span>
+        ${first.cx ? '' : viewSwitch(true)}
+      </div>
+    </div>
+    ${wherePill(first)}
+    ${openRuns.has(key(first)) ? patternHTML(first) : ''}
+  </div><h2>Following trains</h2><div class="list">`;
   const rest = data.list.filter(x => x !== first);
-  if (!rest.length) h += `<div class="list"><div class="empty">No more trains found.</div></div>`;
+  if (!rest.length) h += `<div class="empty">No more trains found.</div>`;
   rest.forEach(x => { h += rowHTML(x); });
-  if (data.more) h += `<button class="more card" id="moreBtn">Show 3 more departures</button>`;
+  if (data.more) h += `<button class="more" id="moreBtn">Show 3 more departures</button>`;
   return h + '</div>';
 }
 function stopTimes(x){
@@ -763,7 +725,7 @@ function wherePill(x, inRow){
   const sw = inRow ? viewSwitch(false) : '';   // the next train has its switch beside the countdown
   const fs = fsKey === k;
   return sw + (onMap ? `<div class="lmap${fs ? ' fs' : ''}" data-k="${esc(k)}"><button class="fsbtn" data-fs="${esc(k)}" aria-label="${fs ? 'Close full screen' : 'Full screen map'}">${fs ? '✕' : '⤢'}</button></div>` : g)
-    + `<div class="where">${txt}${dist != null ? ` · ${dist.toFixed(1)} km trip` : ''}</div>`;
+    + `<div class="where">${txt}${dist != null ? ` · ${dist.toFixed(1)} km trip` : ''}${inRow || openRuns.has(k) ? '' : ' · tap for all stops'}</div>`;
 }
 // place station names on the line map without overlaps: your From/To always shown (second row if needed)
 function layoutTracks(){
