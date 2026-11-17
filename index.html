@@ -104,6 +104,13 @@
   .rtrk .where{color:var(--muted)}
   .row.cx .t,.row.cx .a{text-decoration:line-through;color:var(--muted)}
 
+  .hero.next2{margin-top:10px;background:var(--card);cursor:default}
+  .hero.next2 .tap{cursor:pointer}
+  .hero.next2 .big{font-size:52px} .hero.next2 .big.wide{font-size:44px}
+  .hero.next2.cx .big,.hero.next2.cx .meta2 b{text-decoration:line-through;opacity:.6}
+  .showtrk{margin-top:6px;color:var(--accent);font-weight:600;font-size:13px}
+  .hidetrk{display:block;margin:10px 0 -6px auto;color:var(--accent);font-weight:600;font-size:13px;padding:4px 0}
+  .more.card2{margin-top:10px;border-top:0;background:var(--card);border-radius:16px}
   /* stopping pattern */
   .pat{padding:4px 16px 14px 22px}
   .ps{display:grid;grid-template-columns:18px 1fr auto;gap:10px;align-items:center;position:relative;padding:5px 0;font-size:14px}
@@ -610,28 +617,38 @@ function recentHTML(){
   data.past.forEach(x => { h += rowHTML(x); });
   return h + `<button class="more" id="hideEarlier">Hide recent departures</button></div>`;
 }
+// header block shared by the next train and the following trains
+function headHTML(x, open){
+  const [n,u] = cdown(x.when);
+  return `<div class="toprow">
+      <div><div class="big${String(n).length > 2 ? ' wide' : ''}">${x.cx ? '—' : n}${u && !x.cx ? `<small>${u}</small>` : ''}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${pill(x)}${coachTag(x)}</div></div>
+      <div class="meta2">
+        <span>Departs <b>${fmt(x.when)}</b> ${x.plat ? `<i class="ptag">Plat ${esc(x.plat)}</i>` : `<i class="ptag none">Plat –</i>`}</span>${x.est && Math.abs(x.est-x.sched) >= 120000 ? `<span style="opacity:.6;font-size:12px">was <s>${fmt(x.sched)}</s></span>` : ''}
+        <span>Arrives <b>${fmt(arrOf(x,true))}</b></span>
+        <span>${durOf(x,true)} min</span>
+        ${x.cx ? '' : open ? viewSwitch(true) : `<span class="showtrk">${viewPref === 'map' ? 'Show map ▾' : 'Show track ▾'}</span>`}
+      </div>
+    </div>`;
+}
 function renderLive(){
   const first = data.list.find(x => !x.cx) || data.list[0];
-  const [n,u] = cdown(first.when);
   let h = recentHTML() + `<div class="hero">
     <div class="lbl">Next train to ${esc(st.to)}</div>
-    <div class="toprow">
-      <div><div class="big${String(n).length > 2 ? ' wide' : ''}">${n}${u ? `<small>${u}</small>` : ''}</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">${pill(first)}${coachTag(first)}</div></div>
-      <div class="meta2">
-        <span>Departs <b>${fmt(first.when)}</b> ${first.plat ? `<i class="ptag">Plat ${esc(first.plat)}</i>` : `<i class="ptag none">Plat –</i>`}</span>${first.est && Math.abs(first.est-first.sched) >= 120000 ? `<span style="opacity:.6;font-size:12px">was <s>${fmt(first.sched)}</s></span>` : ''}
-        <span>Arrives <b>${fmt(arrOf(first,true))}</b></span>
-        <span>${durOf(first,true)} min</span>
-        ${first.cx ? '' : viewSwitch(true)}
-      </div>
-    </div>
+    ${headHTML(first, true)}
     ${wherePill(first)}
-  </div><h2>Following trains</h2><div class="list">`;
+  </div><h2>Following trains</h2>`;
   const rest = data.list.filter(x => x !== first);
-  if (!rest.length) h += `<div class="empty">No more trains found.</div>`;
-  rest.forEach(x => { h += rowHTML(x); });
-  if (data.more) h += `<button class="more" id="moreBtn">Show 3 more departures</button>`;
-  return h + '</div>';
+  if (!rest.length) h += `<div class="list"><div class="empty">No more trains found.</div></div>`;
+  rest.forEach(x => {
+    const k = key(x), open = openRuns.has(k) && !x.cx;
+    h += `<div class="hero next2${x.cx ? ' cx' : ''}">
+      <div class="tap" data-run="${esc(k)}">${headHTML(x, open)}</div>
+      ${open ? wherePill(x) + `<button class="hidetrk" data-run="${esc(k)}">Hide ${viewPref === 'map' ? 'map' : 'track'} ▴</button>` : ''}
+    </div>`;
+  });
+  if (data.more) h += `<button class="more card2" id="moreBtn">Show 3 more departures</button>`;
+  return h;
 }
 function stopTimes(x){
   return x.t[4].map((s,k) => ({ name: TT.stations[s[0]], sched: melb(x.day, s[1]),
