@@ -228,6 +228,8 @@
   .toprow > div:first-child{min-width:0;max-width:52%;flex:none}
   .toprow .meta2{flex:1}
   .toprow .pill.coach{white-space:normal;line-height:1.2}
+  .ptag{font-style:normal;display:inline-block;margin-left:4px;padding:1px 7px;border-radius:8px;background:rgba(255,211,107,.18);color:#ffd36b;font-size:12px;font-weight:700;vertical-align:middle}
+  .ptag.none{background:rgba(255,255,255,.08);color:rgba(255,255,255,.45)}
   .snake .s-pl{font-size:9.5px;font-weight:700;fill:#ffd36b;text-anchor:middle}
   .snake .s-pl.mine{fill:#fff}
   .mplat{display:inline-block;padding:1px 5px;border-radius:6px;background:#1a1622;color:#ffd36b;font:700 10px -apple-system,sans-serif;box-shadow:0 1px 3px rgba(0,0,0,.4);white-space:nowrap}
@@ -617,7 +619,7 @@ function renderLive(){
       <div><div class="big${String(n).length > 2 ? ' wide' : ''}">${n}${u ? `<small>${u}</small>` : ''}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">${pill(first)}${coachTag(first)}</div></div>
       <div class="meta2">
-        <span>Departs <b>${fmt(first.when)}</b></span>${first.est && Math.abs(first.est-first.sched) >= 120000 ? `<span style="opacity:.6;font-size:12px">was <s>${fmt(first.sched)}</s></span>` : ''}
+        <span>Departs <b>${fmt(first.when)}</b> ${first.plat ? `<i class="ptag">Plat ${esc(first.plat)}</i>` : `<i class="ptag none">Plat –</i>`}</span>${first.est && Math.abs(first.est-first.sched) >= 120000 ? `<span style="opacity:.6;font-size:12px">was <s>${fmt(first.sched)}</s></span>` : ''}
         <span>Arrives <b>${fmt(arrOf(first,true))}</b></span>
         <span>${durOf(first,true)} min</span>
         ${first.cx ? '' : viewSwitch(true)}
@@ -700,7 +702,7 @@ function wherePill(x, inRow){
   order.forEach((id, sl) => {
     const P = ptS(sl), k = stopAt.has(id) ? stopAt.get(id) : -1, s = k >= 0 ? p[k] : null;
     const off = !s || s.skip, mine = k >= 0 && (k === x.i || k === x.j), past = !off && k <= i;
-    if (s && s.plat && !s.skip) g += `<text x="${P.x}" y="${P.y - 11}" class="s-pl${mine ? ' mine' : ''}">P${esc(s.plat)}</text>`;
+    if (s && s.plat && !s.skip && k === x.i) g += `<text x="${P.x}" y="${P.y - 11}" class="s-pl${mine ? ' mine' : ''}">P${esc(s.plat)}</text>`;
     g += `<circle cx="${P.x}" cy="${P.y}" r="${mine ? 6.5 : 4.5}" class="s-dot${mine ? ' mine' : ''}${past ? ' past' : ''}${off ? ' off' : ''}"/>`;
     if (off) g += `<path d="M${P.x - 4.5} ${P.y - 4.5}l9 9m0 -9l-9 9" class="s-x"/>`;
     const name = TT.stations[id], words = name.split(' '), two = name.length > 10 && words.length > 1;
@@ -859,8 +861,7 @@ function drawTrip(c, x){
     const mine = k === x.i || k === x.j, ll = atKm(km[s[0]]).ll, passed = T && (up ? km[s[0]] >= T.km : km[s[0]] <= T.km);
     const m = L.circleMarker(ll, { radius: mine ? 7 : 5, color: mine ? '#ffffff' : '#3a3442', weight: mine ? 3 : 2, fillColor: mine ? '#a23bbf' : passed ? '#19b37a' : '#ffffff', fillOpacity: 1 }).addTo(lg);
     const t = p[k].skip ? 'not stopping' : fmt(p[k].est || p[k].sched);
-    m.bindTooltip(`${p[k].plat ? `Platform ${esc(p[k].plat)} · ` : ''}${esc(p[k].name)} · ${t}`, { className: 'stn', direction: 'top', offset: [0, -6], permanent: mine });
-    if (p[k].plat && !p[k].skip && !mine) L.marker(ll, { interactive: false, icon: L.divIcon({ className: '', iconSize: [30, 16], iconAnchor: [15, 24], html: `<div class="mplat">P${esc(p[k].plat)}</div>` }) }).addTo(lg);
+    m.bindTooltip(`${p[k].plat && k === x.i ? `Platform ${esc(p[k].plat)} · ` : ''}${esc(p[k].name)} · ${t}`, { className: 'stn', direction: 'top', offset: [0, -6], permanent: mine });
   });
   if (T){
     const pt = atKm(T.km), brg = pt.brg + (up ? 180 : 0);
