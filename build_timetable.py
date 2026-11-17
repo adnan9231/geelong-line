@@ -106,8 +106,8 @@ def platform_of(row):
     if not row:
         return ''
     code = (row.get('platform_code') or '').strip()
-    if code:
-        return code
+    if re.fullmatch(r'[0-9]{1,2}[A-Za-z]?', code):   # skip e.g. "Replacement bus"
+        return code.upper()
     for f in ('stop_name', 'stop_desc', 'platform_name', 'stop_code'):
         m = PLAT_RE.search(row.get(f) or '')
         if m:
