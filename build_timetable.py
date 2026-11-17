@@ -75,6 +75,46 @@ def regional_train_files(outer_path):
     raise SystemExit('Could not find Regional Train (folder 1) data in the GTFS zip')
 
 
+def other_mode_stops(outer_path):
+    """stops.txt rows from every other mode folder (e.g. metro trains), keyed by stop_id.
+    Used only to borrow platform numbers for stop ids the regional data leaves blank."""
+    out = {}
+    try:
+        outer = zipfile.ZipFile(outer_path)
+        for n in outer.namelist():
+            m = re.search(r'(^|/)(\d+)/google_transit\.zip$', n)
+            if not m or m.group(2) == '1':
+                continue
+            try:
+                inner = zipfile.ZipFile(io.BytesIO(outer.read(n)))
+                st = [x for x in inner.namelist() if x.endswith('stops.txt')]
+                if st:
+                    for r in csv.DictReader(io.StringIO(inner.read(st[0]).decode('utf-8-sig'))):
+                        out.setdefault(r['stop_id'], r)
+            except Exception as e:
+                log('Skipped', n, e)
+    except Exception as e:
+        log('Other-mode stops skipped:', e)
+    log('Other-mode stops read:', len(out))
+    return out
+
+
+PLAT_RE = re.compile(r'\b(?:platform|plat|pl)\.?\s*([0-9]{1,2}[a-z]?)\b', re.I)
+
+
+def platform_of(row):
+    if not row:
+        return ''
+    code = (row.get('platform_code') or '').strip()
+    if code:
+        return code
+    for f in ('stop_name', 'stop_desc', 'platform_name', 'stop_code'):
+        m = PLAT_RE.search(row.get(f) or '')
+        if m:
+            return m.group(1).upper()
+    return ''
+
+
 def rows(files, name):
     if name not in files:
         return []
@@ -202,7 +242,8 @@ def geometry(files, stops, stop_station, station_of_trip_ids, trips, routes):
     }
 
 
-def build(files, today):
+def build(files, today, extra_stops=None):
+    extra_stops = extra_stops or {}
     stops = {s['stop_id']: s for s in rows(files, 'stops.txt')}
     idx_by_name = {n.lower(): i for i, n in enumerate(LINE)}
 
@@ -218,8 +259,17 @@ def build(files, today):
         return None
 
     stop_station = {sid: st for sid in stops if (st := station_of(sid)) is not None}
-    platforms = {sid: (stops[sid].get('platform_code') or '').strip() for sid in stop_station
-                 if (stops[sid].get('platform_code') or '').strip()}
+    platforms = {}
+    for sid in stop_station:
+        pl = platform_of(stops[sid]) or platform_of(extra_stops.get(sid))
+        if pl:
+            platforms[sid] = pl
+    # What the data says about each line-station stop id (kept small; lets us check platforms later)
+    stop_info = {sid: [stops[sid].get('stop_name', ''), stops[sid].get('platform_code', ''),
+                       stops[sid].get('stop_desc', ''), stops[sid].get('parent_station', ''),
+                       stops[sid].get('location_type', ''),
+                       (extra_stops.get(sid) or {}).get('platform_code', '')]
+                 for sid in stop_station}
     log('Platform numbers found for', len(platforms), 'stop ids')
     log('Line stations found:', sorted({LINE[i] for i in stop_station.values()}, key=LINE.index))
 
@@ -287,6 +337,7 @@ def build(files, today):
         'stations': LINE,
         'stopIds': stop_station,           # GTFS stop_id (incl. platforms) -> station index
         'platforms': platforms,            # GTFS stop_id -> platform number, where the data has one
+        'stopInfo': stop_info,             # stop_id -> [name, platform_code, desc, parent, location_type, other-mode platform_code]
         'services': services,              # list of active dates (yyyymmdd) per service
         'trips': out_trips,                # [trip_id, service, headsign, coach?, [[station, minutes, stop_sequence, platform]...]]
     }
@@ -295,7 +346,7 @@ def build(files, today):
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else download(find_download_url())
     today = datetime.now(timezone(timedelta(hours=10))).date()
-    data = build(regional_train_files(path), today)
+    data = build(regional_train_files(path), today, other_mode_stops(path))
     if not data['trips']:
         raise SystemExit('No Geelong line trips found — not updating timetable.json.')
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'timetable.json')
